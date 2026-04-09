@@ -12,18 +12,15 @@ from app.core.config import settings
 from app.core.logging import setup_logging
 from app.db.session import engine
 
+setup_logging()
 logger = logging.getLogger("app.main")
 
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
-    setup_logging()
-    logger.info("Starting Xianxia Agent API (env=%s)", settings.app_env)
-
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-        logger.info("PostgreSQL connection OK")
     except Exception:
         logger.warning("PostgreSQL is unreachable — character APIs will fail until DB is up")
 
@@ -31,16 +28,14 @@ async def lifespan(application: FastAPI):
         r = redis.from_url(settings.redis_url)
         r.ping()
         r.close()
-        logger.info("Redis connection OK")
     except Exception:
         logger.warning("Redis is unreachable — session memory will fail until Redis is up")
 
-    if not settings.openai_api_key:
+    key = settings.openai_api_key
+    if not key or len(key) < 10:
         logger.warning("OPENAI_API_KEY is not set — chat endpoints will return errors")
 
     yield
-
-    logger.info("Shutting down Xianxia Agent API")
     engine.dispose()
 
 
@@ -78,19 +73,19 @@ async def runtime_error_handler(request: Request, exc: RuntimeError):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={"detail": "语言模型未配置，请联系管理员。"},
         )
-    logger.exception("Unhandled RuntimeError")
+    logger.exception("RuntimeError on %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "内部错误。"},
+        content={"detail": f"内部错误：{msg[:200]}"},
     )
 
 
 @app.exception_handler(Exception)
 async def catch_all_handler(request: Request, exc: Exception):
-    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    logger.exception("%s on %s %s: %s", type(exc).__name__, request.method, request.url.path, exc)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "内部错误，请稍后重试。"},
+        content={"detail": f"{type(exc).__name__}: {str(exc)[:200]}"},
     )
 
 

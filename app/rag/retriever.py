@@ -11,15 +11,23 @@ _vectorstore: Any = None
 _retriever: Any = None
 
 
+def _has_valid_key() -> bool:
+    key = settings.openai_api_key
+    return bool(key and len(key) > 10)
+
+
 def _embeddings():
-    if not settings.openai_api_key:
+    if not _has_valid_key():
         return None
     from langchain_openai import OpenAIEmbeddings
 
-    return OpenAIEmbeddings(
-        api_key=settings.openai_api_key,
-        model=settings.openai_embedding_model,
-    )
+    kwargs: dict = {
+        "api_key": settings.openai_api_key,
+        "model": settings.openai_embedding_model,
+    }
+    if settings.openai_base_url:
+        kwargs["base_url"] = settings.openai_base_url
+    return OpenAIEmbeddings(**kwargs)
 
 
 def get_vectorstore():

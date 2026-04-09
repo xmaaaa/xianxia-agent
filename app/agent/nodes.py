@@ -35,18 +35,21 @@ def retrieve_context(state: AgentState) -> dict:
     q = _last_human_text(state["messages"])
     intent = _infer_intent(q)
     ctx = retrieve_context_text(q) if intent == "skill_qa" else ""
-    logger.debug("retrieve_context intent=%s ctx_len=%d", intent, len(ctx))
     return {"current_intent": intent, "retrieved_context": ctx}
 
 
 def _llm() -> ChatOpenAI:
-    if not settings.openai_api_key:
+    key = settings.openai_api_key
+    if not key or len(key) < 10:
         raise RuntimeError("OPENAI_API_KEY is not set; cannot call the language model.")
-    return ChatOpenAI(
-        api_key=settings.openai_api_key,
-        model=settings.openai_model,
-        temperature=0.75,
-    )
+    kwargs: dict = {
+        "api_key": key,
+        "model": settings.openai_model,
+        "temperature": 0.75,
+    }
+    if settings.openai_base_url:
+        kwargs["base_url"] = settings.openai_base_url
+    return ChatOpenAI(**kwargs)
 
 
 def build_system_and_llm_messages(state: AgentState, config: RunnableConfig) -> list:
@@ -68,7 +71,6 @@ def generate_response(state: AgentState, config: RunnableConfig) -> dict:
     llm = _llm()
     prompt_messages = build_system_and_llm_messages(state, config)
     resp: AIMessage = llm.invoke(prompt_messages)
-    logger.debug("generate_response reply_len=%d", len(str(resp.content)))
     return {"messages": [resp]}
 
 
@@ -91,5 +93,4 @@ def save_memory(state: AgentState) -> dict:
         elif isinstance(m, AIMessage) or getattr(m, "type", None) == "ai":
             serialized.append({"role": "assistant", "content": str(m.content)})
     set_session_messages(uid, cid, serialized)
-    logger.debug("save_memory user=%s char=%s turns=%d", uid, cid, len(serialized))
     return {}

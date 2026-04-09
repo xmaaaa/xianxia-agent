@@ -62,17 +62,12 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
             detail="Use POST /chat/stream with the same body for streaming.",
         )
     _require_character(db, req.character_id, req.user_id)
-    logger.info("chat user=%s char=%s intent=pending", req.user_id, req.character_id)
     graph = get_agent_graph()
     state = _build_initial_state(req)
     config = {"configurable": {"db": db}}
     result = graph.invoke(state, config=config)
     last = result["messages"][-1]
     reply = str(getattr(last, "content", ""))
-    logger.info(
-        "chat done user=%s char=%s intent=%s reply_len=%d",
-        req.user_id, req.character_id, result.get("current_intent"), len(reply),
-    )
     return ChatResponse(
         reply=reply,
         retrieved_context=result.get("retrieved_context", ""),
@@ -112,21 +107,17 @@ def _sse_token_stream(req: ChatRequest, db: Session) -> Iterator[bytes]:
         try:
             save_memory(final)
         except Exception:
-            logger.exception("Failed to save session to Redis after streaming")
+            logger.exception("Failed to save session to Redis")
         yield _sse_event({
             "done": True,
             "current_intent": merged["current_intent"],
             "retrieved_context": merged["retrieved_context"],
         })
-        logger.info(
-            "stream done user=%s char=%s intent=%s tokens=%d",
-            req.user_id, req.character_id, merged["current_intent"], len(pieces),
-        )
     except HTTPException as exc:
         yield _sse_event({"error": exc.detail, "status": exc.status_code})
     except Exception as exc:
-        logger.exception("SSE stream error for user=%s char=%s", req.user_id, req.character_id)
-        yield _sse_event({"error": f"服务异常：{type(exc).__name__}", "status": 500})
+        logger.exception("SSE stream error: %s", exc)
+        yield _sse_event({"error": f"{type(exc).__name__}: {str(exc)[:300]}", "status": 500})
 
 
 def _sse_with_db(req: ChatRequest):

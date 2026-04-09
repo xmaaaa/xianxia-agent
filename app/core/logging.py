@@ -1,24 +1,30 @@
 import logging
 import sys
+from pathlib import Path
 
-from app.core.config import settings
+from app.core.config import PROJECT_ROOT
 
 LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+LOG_FILE = PROJECT_ROOT / "app.log"
 
 
 def setup_logging() -> None:
-    level = logging.DEBUG if settings.app_env == "development" else logging.INFO
+    formatter = logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
 
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT))
+    file_handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(logging.WARNING)
 
-    root = logging.getLogger()
-    root.setLevel(level)
-    if not root.handlers:
-        root.addHandler(handler)
+    console_handler = logging.StreamHandler(sys.stderr)
+    console_handler.setFormatter(formatter)
+    console_handler.setLevel(logging.WARNING)
+
+    app_logger = logging.getLogger("app")
+    app_logger.handlers.clear()
+    app_logger.setLevel(logging.WARNING)
+    app_logger.addHandler(file_handler)
+    app_logger.addHandler(console_handler)
 
     for noisy in ("httpcore", "httpx", "urllib3", "chromadb", "sqlalchemy.engine"):
-        logging.getLogger(noisy).setLevel(logging.WARNING)
-
-    logging.getLogger("app").setLevel(level)
+        logging.getLogger(noisy).setLevel(logging.ERROR)

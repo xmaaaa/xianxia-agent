@@ -1,0 +1,42 @@
+---
+description: Xianxia Agent project conventions, phase plan, and GitHub showcase guidelines
+alwaysApply: true
+---
+
+# Xianxia Agent — Project Rules
+
+## Identity
+修仙 RPG AI Agent: LangGraph + RAG + FastAPI. Target: GitHub showcase + 微信小程序后台.
+
+## Phase Roadmap (adjusted)
+- [x] Phase 1: 对话 + 角色 + 基础 RAG + 工程地基
+- [ ] Phase 2a: 记忆分层（滑动窗口 + 摘要压缩）+ 统一流式/非流式路径
+- [ ] Phase 2b: Intent 路由（LLM 意图分类 + LangGraph 条件边）
+- [ ] Phase 3: Function Calling + 游戏系统（战斗/炼丹/探索作为 Tool）
+- [ ] Phase 4: 境界成长 + 持久化世界（经验/突破/事件日志/成就）
+- [ ] Phase 5: 多 Agent NPC（子图 + 独立人设记忆 + 对话/交易/师徒）
+
+## Tech Stack
+Python 3.11+ | FastAPI | LangGraph | LangChain | ChromaDB | PostgreSQL | Redis | SQLAlchemy + Alembic | Pydantic v2 | Streamlit (MVP frontend)
+
+## Code Conventions
+- Chinese strings (prompts, UI text, error messages) use fullwidth punctuation — this is intentional, do NOT "fix" them
+- Pydantic models use `Optional[X]` (not `X | None`) for runtime compatibility
+- All API routes go under `app/api/routes/`, prefixed `/api/v1/`
+- LangGraph nodes go in `app/agent/nodes.py`, graph in `app/agent/graph.py`
+- Every new feature needs tests in `tests/`; use conftest.py fixtures (mock_redis, mock_openai, client, db_session)
+- Run `ruff check` and `pytest` before committing
+- Commit messages: `feat:` for features, `fix:` for bugs, `chore:` for infra, `docs:` for docs
+
+## GitHub Showcase Checklist (update each Phase)
+After completing each Phase:
+1. Update README.md Mermaid architecture diagram to reflect new graph structure
+2. Update the Phase roadmap checkboxes in README.md
+3. Add/update `docs/adr-NNN-*.md` for key architecture decisions made in that Phase
+4. Record a demo GIF/video showing the new feature working, add to README
+5. Tag the commit: `git tag v0.X-phaseN`
+6. Write a "Architecture Decisions" section explaining WHY, not just WHAT
+
+## Architecture Decision Records (ADR)
+Place in `docs/` with format `adr-NNN-short-title.md`. Keep each under 200 lines.
+Template: Context → Decision → Consequences → Alternatives Considered.

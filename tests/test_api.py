@@ -76,7 +76,9 @@ def test_delete_character(client):
     assert r.status_code == 404
 
 
-def test_chat_requires_openai_key(client, mock_redis):
+def test_chat_requires_openai_key(client, mock_redis, monkeypatch):
+    monkeypatch.setattr("app.core.config.settings.openai_api_key", "")
+
     payload = {
         "user_id": "u1",
         "name": "测试",
