@@ -1,0 +1,96 @@
+def test_health(client):
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok"}
+
+
+def test_create_and_list_character(client):
+    payload = {
+        "user_id": "test-user-1",
+        "name": "云游子",
+        "sect": "太清宗",
+        "spirit_root": "水木双灵根",
+    }
+    r = client.post("/api/v1/characters/", json=payload)
+    assert r.status_code == 201
+    data = r.json()
+    assert data["name"] == "云游子"
+    assert data["realm"] == "炼气初期"
+    assert data["exp"] == 0
+    cid = data["id"]
+
+    r = client.get("/api/v1/characters/", params={"user_id": "test-user-1"})
+    assert r.status_code == 200
+    ids = [c["id"] for c in r.json()]
+    assert cid in ids
+
+
+def test_get_character_wrong_user(client):
+    payload = {
+        "user_id": "owner",
+        "name": "剑仙",
+        "sect": "蜀山",
+        "spirit_root": "金灵根",
+    }
+    r = client.post("/api/v1/characters/", json=payload)
+    cid = r.json()["id"]
+
+    r = client.get(f"/api/v1/characters/{cid}", params={"user_id": "stranger"})
+    assert r.status_code == 404
+
+
+def test_update_character(client):
+    payload = {
+        "user_id": "u2",
+        "name": "初名",
+        "sect": "散修",
+        "spirit_root": "火灵根",
+    }
+    r = client.post("/api/v1/characters/", json=payload)
+    cid = r.json()["id"]
+
+    r = client.patch(
+        f"/api/v1/characters/{cid}",
+        params={"user_id": "u2"},
+        json={"name": "新名", "realm": "筑基初期"},
+    )
+    assert r.status_code == 200
+    assert r.json()["name"] == "新名"
+    assert r.json()["realm"] == "筑基初期"
+
+
+def test_delete_character(client):
+    payload = {
+        "user_id": "u3",
+        "name": "将删",
+        "sect": "无",
+        "spirit_root": "无灵根",
+    }
+    r = client.post("/api/v1/characters/", json=payload)
+    cid = r.json()["id"]
+
+    r = client.delete(f"/api/v1/characters/{cid}", params={"user_id": "u3"})
+    assert r.status_code == 204
+
+    r = client.get(f"/api/v1/characters/{cid}", params={"user_id": "u3"})
+    assert r.status_code == 404
+
+
+def test_chat_requires_openai_key(client, mock_redis):
+    payload = {
+        "user_id": "u1",
+        "name": "测试",
+        "sect": "测试宗",
+        "spirit_root": "测试灵根",
+    }
+    r = client.post("/api/v1/characters/", json=payload)
+    cid = r.json()["id"]
+
+    r = client.post("/api/v1/chat/", json={
+        "user_id": "u1",
+        "character_id": cid,
+        "message": "你好",
+        "stream": False,
+    })
+    assert r.status_code == 503
+    assert "语言模型" in r.json()["detail"]

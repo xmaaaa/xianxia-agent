@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Iterator
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -11,6 +12,8 @@ from app.memory.long_term import load_character_profile
 from app.memory.short_term import set_session_messages
 from app.rag.retriever import retrieve_context_text
 
+logger = logging.getLogger("app.agent")
+
 
 def _last_human_text(messages: list) -> str:
     for m in reversed(messages):
@@ -22,9 +25,8 @@ def _last_human_text(messages: list) -> str:
 
 
 def _infer_intent(user_text: str) -> str:
-    t = user_text
     keys = ("功法", "修炼", "剑法", "诀", "术", "筑基", "金丹", "炼气", "逆天", "太清", "典籍")
-    if any(k in t for k in keys):
+    if any(k in user_text for k in keys):
         return "skill_qa"
     return "roleplay"
 
@@ -33,6 +35,7 @@ def retrieve_context(state: AgentState) -> dict:
     q = _last_human_text(state["messages"])
     intent = _infer_intent(q)
     ctx = retrieve_context_text(q) if intent == "skill_qa" else ""
+    logger.debug("retrieve_context intent=%s ctx_len=%d", intent, len(ctx))
     return {"current_intent": intent, "retrieved_context": ctx}
 
 
@@ -65,6 +68,7 @@ def generate_response(state: AgentState, config: RunnableConfig) -> dict:
     llm = _llm()
     prompt_messages = build_system_and_llm_messages(state, config)
     resp: AIMessage = llm.invoke(prompt_messages)
+    logger.debug("generate_response reply_len=%d", len(str(resp.content)))
     return {"messages": [resp]}
 
 
@@ -87,4 +91,5 @@ def save_memory(state: AgentState) -> dict:
         elif isinstance(m, AIMessage) or getattr(m, "type", None) == "ai":
             serialized.append({"role": "assistant", "content": str(m.content)})
     set_session_messages(uid, cid, serialized)
+    logger.debug("save_memory user=%s char=%s turns=%d", uid, cid, len(serialized))
     return {}

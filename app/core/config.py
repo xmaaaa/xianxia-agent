@@ -18,7 +18,6 @@ class Settings(BaseSettings):
     )
 
     app_env: str = Field(default="development", alias="APP_ENV")
-    secret_key: str = Field(default="change-me-in-production", alias="SECRET_KEY")
 
     database_url: str = Field(
         default="postgresql+psycopg://xianxia:xianxia@localhost:5432/xianxia_db",
