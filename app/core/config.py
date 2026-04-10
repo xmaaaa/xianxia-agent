@@ -32,10 +32,33 @@ class Settings(BaseSettings):
         default="text-embedding-3-small",
         alias="OPENAI_EMBEDDING_MODEL",
     )
+    openai_embedding_base_url: Optional[str] = Field(
+        default=None,
+        alias="OPENAI_EMBEDDING_BASE_URL",
+    )
 
     chroma_persist_dir: Path = Field(
         default=PROJECT_ROOT / "data" / "chroma",
         alias="CHROMA_PERSIST_DIR",
+    )
+
+    memory_recent_turns_max: int = Field(
+        default=10,
+        ge=2,
+        le=50,
+        alias="MEMORY_RECENT_TURNS_MAX",
+    )
+    memory_summary_max_chars: int = Field(
+        default=1200,
+        ge=200,
+        le=8000,
+        alias="MEMORY_SUMMARY_MAX_CHARS",
+    )
+    memory_max_tokens: int = Field(
+        default=4000,
+        ge=200,
+        le=32000,
+        alias="MEMORY_MAX_TOKENS",
     )
 
     api_host: str = Field(default="127.0.0.1", alias="API_HOST")

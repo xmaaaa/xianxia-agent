@@ -1,15 +1,22 @@
 import logging
-from collections.abc import Iterator
+from typing import Optional
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 
-from app.agent.prompts import render_system_prompt
+from app.agent.prompts import SUMMARY_MERGE_TEMPLATE, render_system_prompt
 from app.agent.state import AgentState
 from app.core.config import settings
+from app.memory.layered import (
+    count_turns,
+    format_turn_for_summary,
+    load_layered_session,
+    messages_token_count,
+    pop_oldest_turn,
+    save_layered_session,
+)
 from app.memory.long_term import load_character_profile
-from app.memory.short_term import set_session_messages
 from app.rag.retriever import retrieve_context_text
 
 logger = logging.getLogger("app.agent")
@@ -22,6 +29,28 @@ def _last_human_text(messages: list) -> str:
         if getattr(m, "type", None) == "human":
             return str(m.content)
     return ""
+
+
+def _last_turn_as_dicts(messages: list) -> Optional[tuple[dict, dict]]:
+    last_ai = ""
+    last_human = ""
+    for m in reversed(messages):
+        if not last_ai and (
+            isinstance(m, AIMessage) or getattr(m, "type", None) == "ai"
+        ):
+            last_ai = str(m.content)
+            continue
+        if last_ai and (
+            isinstance(m, HumanMessage) or getattr(m, "type", None) == "human"
+        ):
+            last_human = str(m.content)
+            break
+    if last_human and last_ai:
+        return (
+            {"role": "user", "content": last_human},
+            {"role": "assistant", "content": last_ai},
+        )
+    return None
 
 
 def _infer_intent(user_text: str) -> str:
@@ -52,6 +81,53 @@ def _llm() -> ChatOpenAI:
     return ChatOpenAI(**kwargs)
 
 
+def _merge_older_turn_into_summary(llm: ChatOpenAI, old_summary: str, dialog_excerpt: str) -> str:
+    max_chars = settings.memory_summary_max_chars
+    old_block = old_summary.strip() or "（无）"
+    text = SUMMARY_MERGE_TEMPLATE.format(
+        old_summary=old_block,
+        dialog_excerpt=dialog_excerpt,
+        max_chars=max_chars,
+    )
+    comp = llm.bind(temperature=0.2, max_tokens=min(1024, max_chars + 128))
+    resp = comp.invoke([HumanMessage(content=text)])
+    out = str(getattr(resp, "content", "")).strip()
+    if len(out) > max_chars:
+        out = out[:max_chars]
+    return out
+
+
+def _should_compress(recent: list[dict]) -> bool:
+    if count_turns(recent) > settings.memory_recent_turns_max:
+        return True
+    return messages_token_count(recent) > settings.memory_max_tokens
+
+
+def fold_recent_until_cap(llm: ChatOpenAI, summary: str, recent: list[dict]) -> tuple[str, list[dict]]:
+    recent = list(recent)
+    s = summary
+    while _should_compress(recent):
+        folded_blocks: list[str] = []
+        work = recent
+        while _should_compress(work):
+            turn, rest = pop_oldest_turn(work)
+            if not turn:
+                break
+            folded_blocks.append(format_turn_for_summary(turn))
+            work = rest
+        if not folded_blocks:
+            break
+        excerpt = "\n\n---\n\n".join(folded_blocks)
+        try:
+            s = _merge_older_turn_into_summary(llm, s, excerpt)
+        except Exception:
+            logger.exception("Summary merge failed; folding without LLM merge")
+            s = (s + "\n" + excerpt).strip()[: settings.memory_summary_max_chars]
+        recent = work
+        break
+    return s, recent
+
+
 def build_system_and_llm_messages(state: AgentState, config: RunnableConfig) -> list:
     configurable = config.get("configurable") or {}
     db = configurable.get("db")
@@ -63,34 +139,39 @@ def build_system_and_llm_messages(state: AgentState, config: RunnableConfig) -> 
         profile,
         state["retrieved_context"],
         state["current_intent"],
+        conversation_summary=state["conversation_summary"] or "",
     )
     return [SystemMessage(content=system_text), *state["messages"]]
 
 
-def generate_response(state: AgentState, config: RunnableConfig) -> dict:
+async def generate_response(state: AgentState, config: RunnableConfig) -> dict:
     llm = _llm()
     prompt_messages = build_system_and_llm_messages(state, config)
-    resp: AIMessage = llm.invoke(prompt_messages)
-    return {"messages": [resp]}
-
-
-def stream_llm_tokens(state: AgentState, config: RunnableConfig) -> Iterator[str]:
-    llm = _llm()
-    prompt_messages = build_system_and_llm_messages(state, config)
-    for chunk in llm.stream(prompt_messages):
+    chunks: list[str] = []
+    async for chunk in llm.astream(prompt_messages, config=config):
         c = getattr(chunk, "content", None)
         if c:
-            yield c
+            chunks.append(c)
+    return {"messages": [AIMessage(content="".join(chunks))]}
 
 
 def save_memory(state: AgentState) -> dict:
+    pair = _last_turn_as_dicts(state["messages"])
+    if not pair:
+        logger.warning("save_memory: could not extract last turn, skip persist")
+        return {}
+    user_msg, assistant_msg = pair
     uid = state["user_id"]
     cid = state["character_id"]
-    serialized: list[dict] = []
-    for m in state["messages"]:
-        if isinstance(m, HumanMessage) or getattr(m, "type", None) == "human":
-            serialized.append({"role": "user", "content": str(m.content)})
-        elif isinstance(m, AIMessage) or getattr(m, "type", None) == "ai":
-            serialized.append({"role": "assistant", "content": str(m.content)})
-    set_session_messages(uid, cid, serialized)
+    summary, recent = load_layered_session(uid, cid)
+    recent = list(recent)
+    recent.append(user_msg)
+    recent.append(assistant_msg)
+    try:
+        llm = _llm()
+        summary, recent = fold_recent_until_cap(llm, summary, recent)
+        save_layered_session(uid, cid, summary, recent)
+    except Exception:
+        logger.exception("Failed to persist layered session")
+        raise
     return {}

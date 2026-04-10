@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from langchain_core.documents import Document
 
 from app.core.config import settings
 from app.rag.loader import load_skill_documents
+
+logger = logging.getLogger("app.rag.retriever")
 
 _vectorstore: Any = None
 _retriever: Any = None
@@ -25,8 +28,9 @@ def _embeddings():
         "api_key": settings.openai_api_key,
         "model": settings.openai_embedding_model,
     }
-    if settings.openai_base_url:
-        kwargs["base_url"] = settings.openai_base_url
+    base = settings.openai_embedding_base_url
+    if base:
+        kwargs["base_url"] = base
     return OpenAIEmbeddings(**kwargs)
 
 
@@ -70,10 +74,14 @@ def get_retriever():
 def retrieve_context_text(query: str) -> str:
     if not query.strip():
         return ""
-    retriever = get_retriever()
-    if retriever is None:
+    try:
+        retriever = get_retriever()
+        if retriever is None:
+            return ""
+        docs: list[Document] = retriever.invoke(query)
+    except Exception:
+        logger.exception("RAG retrieval failed, returning empty context")
         return ""
-    docs: list[Document] = retriever.invoke(query)
     if not docs:
         return ""
     parts = []

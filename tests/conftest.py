@@ -63,9 +63,13 @@ def mock_openai():
     fake_response = MagicMock()
     fake_response.content = "本座已知晓。"
 
+    async def _fake_astream(*_args, **_kwargs):
+        yield fake_response
+
     with patch("app.agent.nodes._llm") as mock_llm:
         instance = MagicMock()
         instance.invoke.return_value = fake_response
-        instance.stream.return_value = iter([fake_response])
+        instance.astream = _fake_astream
+        instance.bind.return_value = instance
         mock_llm.return_value = instance
         yield instance

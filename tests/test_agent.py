@@ -21,6 +21,7 @@ def test_retrieve_context_sets_intent_and_context_keys(_mock_rt):
         "user_id": "u1",
         "character_id": 1,
         "messages": [HumanMessage(content="逆天诀有何境界要求？")],
+        "conversation_summary": "",
         "current_intent": "",
         "retrieved_context": "",
     }
@@ -35,6 +36,7 @@ def test_retrieve_context_roleplay_skips_rag(_mock_rt):
         "user_id": "u1",
         "character_id": 1,
         "messages": [HumanMessage(content="今天天气如何")],
+        "conversation_summary": "",
         "current_intent": "",
         "retrieved_context": "",
     }
@@ -55,4 +57,10 @@ def test_render_system_prompt_defaults_when_empty():
     text = render_system_prompt("", "", "")
     assert "无名散修" in text
     assert "暂无检索" in text
+    assert "暂无往事提要" in text
     assert "未分类" in text
+
+
+def test_render_system_prompt_includes_conversation_summary():
+    text = render_system_prompt("档案", "摘录", "roleplay", conversation_summary="曾论剑于东海。")
+    assert "曾论剑于东海" in text

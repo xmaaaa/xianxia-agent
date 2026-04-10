@@ -1,6 +1,6 @@
-# 修仙 AI Agent（Phase 1）
+# 修仙 AI Agent（Phase 2a）
 
-基于 **LangGraph** 编排、**Chroma** 本地向量库与 **FastAPI** 的修仙题材对话 Agent：玩家创建角色后与「叙事之灵」对话；问及功法时通过 RAG 检索内置典籍（`skills.md`）再生成回答。角色档案落在 **PostgreSQL**，同一会话的对话历史缓存在 **Redis**。MVP 前端为 **Streamlit**，独立进程调用 HTTP API。
+基于 **LangGraph** 编排、**Chroma** 本地向量库与 **FastAPI** 的修仙题材对话 Agent：玩家创建角色后与「叙事之灵」对话；问及功法时通过 RAG 检索内置典籍（`skills.md`）再生成回答。角色档案落在 **PostgreSQL**，会话记忆在 **Redis** 中分层存储：**滚动摘要**（更早轮次经 LLM 压缩）+ **近期原文轮次**（滑动窗口，宽度可配置）。MVP 前端为 **Streamlit**，独立进程调用 HTTP API；流式与非流式共用同一套检索与拼装提示词逻辑。
 
 **建议运行环境：Python 3.11+**（依赖栈按 3.11 测试；生产请固定解释器版本。）
 
@@ -23,7 +23,7 @@ flowchart LR
   end
   subgraph data [Data]
     PG[(PostgreSQL)]
-    RD[(Redis)]
+    RD["Redis<br/>摘要+近期轮次"]
     CHM[(Chroma 本地)]
   end
   ST --> CR
@@ -102,9 +102,17 @@ pytest tests/test_agent.py -v
 | POST | `/api/v1/chat/` | 非流式对话（body 中 `stream` 须为 `false`） |
 | POST | `/api/v1/chat/stream` | SSE 流式（body 中建议 `stream: true`） |
 
-## 项目结构（Phase 1）
+## 环境变量（记忆分层，可选）
 
-核心目录与职责与仓库内 `app/`、`frontend/`、`alembic/`、`tests/` 一致；功法示例文本位于 `app/rag/knowledge/skills.md`。
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `MEMORY_RECENT_TURNS_MAX` | `10` | Redis 中保留的完整对话轮次上限（user+assistant 为 1 轮） |
+| `MEMORY_SUMMARY_MAX_CHARS` | `1200` | 滚动摘要目标最大字数 |
+| `MEMORY_MAX_TOKENS` | `4000` | 近期消息 token 上限（轮次与 token 双门槛，先到先触发压缩） |
+
+## 项目结构（Phase 2a）
+
+核心目录与职责与仓库内 `app/`、`frontend/`、`alembic/`、`tests/` 一致；功法示例文本位于 `app/rag/knowledge/skills.md`；分层会话读写见 `app/memory/layered.py`，压缩与落盘在 `app/agent/nodes.py` 的 `save_memory` / `fold_recent_until_cap`。
 
 ## 许可证
 

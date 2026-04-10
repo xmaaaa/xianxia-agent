@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Iterator
+from collections.abc import AsyncIterator
 from typing import Union
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -11,10 +11,9 @@ from langchain_core.messages import AIMessage, HumanMessage
 from sqlalchemy.orm import Session
 
 from app.agent.graph import get_agent_graph
-from app.agent.nodes import retrieve_context, save_memory, stream_llm_tokens
 from app.agent.state import AgentState
 from app.db.session import SessionLocal, get_db
-from app.memory.short_term import get_session_messages
+from app.memory.layered import load_layered_session
 from app.models.character import Character
 from app.schemas.chat import ChatRequest, ChatResponse
 
@@ -42,20 +41,21 @@ def _redis_to_lc_messages(rows: list[dict]) -> list[Union[HumanMessage, AIMessag
 
 
 def _build_initial_state(req: ChatRequest) -> AgentState:
-    prior = get_session_messages(req.user_id, req.character_id)
+    summary, prior = load_layered_session(req.user_id, req.character_id)
     base = _redis_to_lc_messages(prior)
     base.append(HumanMessage(content=req.message))
     return AgentState(
         user_id=req.user_id,
         character_id=req.character_id,
         messages=base,
+        conversation_summary=summary,
         current_intent="",
         retrieved_context="",
     )
 
 
 @router.post("/", response_model=ChatResponse)
-def chat(req: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
+async def chat(req: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
     if req.stream:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -65,7 +65,7 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
     graph = get_agent_graph()
     state = _build_initial_state(req)
     config = {"configurable": {"db": db}}
-    result = graph.invoke(state, config=config)
+    result = await graph.ainvoke(state, config=config)
     last = result["messages"][-1]
     reply = str(getattr(last, "content", ""))
     return ChatResponse(
@@ -79,57 +79,56 @@ def _sse_event(data: dict) -> bytes:
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n".encode()
 
 
-def _sse_token_stream(req: ChatRequest, db: Session) -> Iterator[bytes]:
+async def _sse_token_stream(req: ChatRequest, db: Session) -> AsyncIterator[bytes]:
+    has_tokens = False
+    intent = ""
+    context = ""
     try:
         _require_character(db, req.character_id, req.user_id)
-        state0 = _build_initial_state(req)
-        r1 = retrieve_context(state0)
-        merged: AgentState = {
-            "user_id": state0["user_id"],
-            "character_id": state0["character_id"],
-            "messages": state0["messages"],
-            "current_intent": r1["current_intent"],
-            "retrieved_context": r1["retrieved_context"],
-        }
+        graph = get_agent_graph()
+        state = _build_initial_state(req)
         config = {"configurable": {"db": db}}
-        pieces: list[str] = []
-        for token in stream_llm_tokens(merged, config):
-            pieces.append(token)
-            yield _sse_event({"token": token})
-        full = "".join(pieces)
-        final: AgentState = {
-            "user_id": merged["user_id"],
-            "character_id": merged["character_id"],
-            "messages": [*merged["messages"], AIMessage(content=full)],
-            "current_intent": merged["current_intent"],
-            "retrieved_context": merged["retrieved_context"],
-        }
-        try:
-            save_memory(final)
-        except Exception:
-            logger.exception("Failed to save session to Redis")
-        yield _sse_event({
-            "done": True,
-            "current_intent": merged["current_intent"],
-            "retrieved_context": merged["retrieved_context"],
-        })
+
+        async for event in graph.astream_events(state, config=config, version="v2"):
+            kind = event["event"]
+            node = event.get("metadata", {}).get("langgraph_node", "")
+
+            if kind == "on_chat_model_stream" and node == "generate_response":
+                token = event["data"]["chunk"].content
+                if token:
+                    has_tokens = True
+                    yield _sse_event({"token": token})
+
+            elif kind == "on_chain_end" and node == "retrieve_context":
+                output = event["data"].get("output", {})
+                if isinstance(output, dict):
+                    intent = output.get("current_intent", intent)
+                    context = output.get("retrieved_context", context)
+
+        yield _sse_event({"done": True, "current_intent": intent, "retrieved_context": context})
+
     except HTTPException as exc:
         yield _sse_event({"error": exc.detail, "status": exc.status_code})
     except Exception as exc:
-        logger.exception("SSE stream error: %s", exc)
-        yield _sse_event({"error": f"{type(exc).__name__}: {str(exc)[:300]}", "status": 500})
+        if has_tokens:
+            logger.exception("Post-generation error (tokens already streamed): %s", exc)
+            yield _sse_event({"done": True, "current_intent": intent, "retrieved_context": context})
+        else:
+            logger.exception("SSE stream error: %s", exc)
+            yield _sse_event({"error": f"{type(exc).__name__}: {str(exc)[:300]}", "status": 500})
 
 
-def _sse_with_db(req: ChatRequest):
+async def _sse_with_db(req: ChatRequest) -> AsyncIterator[bytes]:
     db = SessionLocal()
     try:
-        yield from _sse_token_stream(req, db)
+        async for chunk in _sse_token_stream(req, db):
+            yield chunk
     finally:
         db.close()
 
 
 @router.post("/stream")
-def chat_stream(req: ChatRequest) -> StreamingResponse:
+async def chat_stream(req: ChatRequest) -> StreamingResponse:
     return StreamingResponse(
         _sse_with_db(req),
         media_type="text/event-stream",

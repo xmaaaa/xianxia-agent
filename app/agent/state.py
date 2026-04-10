@@ -8,5 +8,6 @@ class AgentState(TypedDict):
     user_id: str
     character_id: int
     messages: Annotated[list[AnyMessage], add_messages]
+    conversation_summary: str
     current_intent: str
     retrieved_context: str
