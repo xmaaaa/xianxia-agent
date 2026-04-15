@@ -1,6 +1,6 @@
-# 修仙 AI Agent（Phase 2a）
+# 修仙 AI Agent（Phase 2b）
 
-基于 **LangGraph** 编排、**Chroma** 本地向量库与 **FastAPI** 的修仙题材对话 Agent：玩家创建角色后与「叙事之灵」对话；问及功法时通过 RAG 检索内置典籍（`skills.md`）再生成回答。角色档案落在 **PostgreSQL**，会话记忆在 **Redis** 中分层存储：**滚动摘要**（更早轮次经 LLM 压缩）+ **近期原文轮次**（滑动窗口，宽度可配置）。MVP 前端为 **Streamlit**，独立进程调用 HTTP API；流式与非流式共用同一套检索与拼装提示词逻辑。
+基于 **LangGraph** 编排、**Chroma** 本地向量库与 **FastAPI** 的修仙题材对话 Agent：玩家创建角色后与「叙事之灵」对话。Graph 内部通过 **意图路由**（关键词优先 + LLM fallback）分发到不同处理分支（角色扮演 / 功法问答 / 场景探索 / 状态查询），各分支做差异化上下文准备后统一生成。会话记忆在 **Redis** 中分层存储：**滚动摘要** + **近期原文轮次**。MVP 前端为 **Streamlit**，流式与非流式共用同一张 LangGraph。
 
 **建议运行环境：Python 3.11+**（依赖栈按 3.11 测试；生产请固定解释器版本。）
 
@@ -16,10 +16,22 @@ flowchart LR
     CH["/api/v1/chat"]
   end
   subgraph agent [LangGraph]
-    R[retrieve_context]
+    CLS[classify_intent]
+    PR[prepare_roleplay]
+    PS[prepare_skill_qa]
+    PE[prepare_explore]
+    PQ[prepare_status_query]
     G[generate_response]
     S[save_memory]
-    R --> G --> S
+    CLS -->|roleplay| PR
+    CLS -->|skill_qa| PS
+    CLS -->|explore| PE
+    CLS -->|status_query| PQ
+    PR --> G
+    PS --> G
+    PE --> G
+    PQ --> G
+    G --> S
   end
   subgraph data [Data]
     PG[(PostgreSQL)]
@@ -32,7 +44,8 @@ flowchart LR
   CR --> PG
   CH --> RD
   CH --> PG
-  R --> CHM
+  PS --> CHM
+  PQ --> PG
   G --> PG
   S --> RD
 ```
@@ -110,9 +123,9 @@ pytest tests/test_agent.py -v
 | `MEMORY_SUMMARY_MAX_CHARS` | `1200` | 滚动摘要目标最大字数 |
 | `MEMORY_MAX_TOKENS` | `4000` | 近期消息 token 上限（轮次与 token 双门槛，先到先触发压缩） |
 
-## 项目结构（Phase 2a）
+## 项目结构（Phase 2b）
 
-核心目录与职责与仓库内 `app/`、`frontend/`、`alembic/`、`tests/` 一致；功法示例文本位于 `app/rag/knowledge/skills.md`；分层会话读写见 `app/memory/layered.py`，压缩与落盘在 `app/agent/nodes.py` 的 `save_memory` / `fold_recent_until_cap`。
+核心目录与职责与仓库内 `app/`、`frontend/`、`alembic/`、`tests/` 一致；意图分类与 prepare 节点在 `app/agent/nodes.py`，Graph 条件边在 `app/agent/graph.py`，所有 prompt 模板在 `app/agent/prompts.py`。分层会话读写见 `app/memory/layered.py`。
 
 ## 许可证
 

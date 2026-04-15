@@ -42,7 +42,7 @@ async def lifespan(application: FastAPI):
 app = FastAPI(
     title="Xianxia Agent API",
     description="修仙 RPG AI Agent — Phase 1",
-    version="0.2.0",
+    version="0.3.0",
     lifespan=lifespan,
 )
 

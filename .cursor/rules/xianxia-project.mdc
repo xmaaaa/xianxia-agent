@@ -11,7 +11,7 @@ alwaysApply: true
 ## Phase Roadmap (adjusted)
 - [x] Phase 1: 对话 + 角色 + 基础 RAG + 工程地基
 - [x] Phase 2a: 记忆分层（滑动窗口 + 摘要压缩）+ 统一流式/非流式路径
-- [ ] Phase 2b: Intent 路由（LLM 意图分类 + LangGraph 条件边）
+- [x] Phase 2b: Intent 路由（LLM 意图分类 + LangGraph 条件边）
 - [ ] Phase 3: Function Calling + 游戏系统（战斗/炼丹/探索作为 Tool）
 - [ ] Phase 4: 境界成长 + 持久化世界（经验/突破/事件日志/成就）
 - [ ] Phase 5: 多 Agent NPC（子图 + 独立人设记忆 + 对话/交易/师徒）

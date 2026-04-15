@@ -99,10 +99,14 @@ async def _sse_token_stream(req: ChatRequest, db: Session) -> AsyncIterator[byte
                     has_tokens = True
                     yield _sse_event({"token": token})
 
-            elif kind == "on_chain_end" and node == "retrieve_context":
+            elif kind == "on_chain_end" and node == "classify_intent":
                 output = event["data"].get("output", {})
                 if isinstance(output, dict):
                     intent = output.get("current_intent", intent)
+
+            elif kind == "on_chain_end" and node.startswith("prepare_"):
+                output = event["data"].get("output", {})
+                if isinstance(output, dict):
                     context = output.get("retrieved_context", context)
 
         yield _sse_event({"done": True, "current_intent": intent, "retrieved_context": context})

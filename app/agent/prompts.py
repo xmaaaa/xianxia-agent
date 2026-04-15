@@ -1,3 +1,30 @@
+VALID_INTENTS = ("roleplay", "skill_qa", "explore", "status_query")
+
+INTENT_CLASSIFY_TEMPLATE = """\
+你是意图分类器。根据玩家最新一句话，输出一个意图标签（仅输出标签本身，不要加任何解释）。
+
+可选标签：
+- roleplay — 角色扮演、日常对话、闲聊、剧情推进
+- skill_qa — 询问功法、修炼方法、境界知识、丹方药理
+- explore — 探索场景、进入秘境、查看周围环境、寻找物品
+- status_query — 查看自身属性、境界、修为值、背包、装备
+
+玩家说：{user_text}
+
+标签："""
+
+EXPLORE_HINT = """\
+
+## 探索模式补充指令
+根据修士当前境界和所在场景，描述他看到/感知到的环境，可包含：地形、灵气浓度、可能的机缘或危险。\
+如果场景信息不足，可以合理生成一个场景。"""
+
+STATUS_QUERY_HINT = """\
+
+## 状态查询补充指令
+下面是修士的最新属性数据，请用简洁的方式展示给玩家。
+{status_data}"""
+
 XIANXIA_SYSTEM_TEMPLATE = """\
 你是一个修仙世界的引导灵，负责带领玩家体验修仙冒险。
 
@@ -19,9 +46,8 @@ XIANXIA_SYSTEM_TEMPLATE = """\
 
 ## 当前意图标签
 {current_intent}
-
+{intent_hint}
 请据此续写对话，回应当前修士之问或行止。"""
-
 
 SUMMARY_MERGE_TEMPLATE = """\
 你是会话纪要生成器。在保留关键设定、人名、境界、宗门与约定前提下，将新对话并入既有提要。
@@ -40,6 +66,7 @@ def render_system_prompt(
     retrieved_context: str,
     current_intent: str,
     conversation_summary: str = "",
+    intent_hint: str = "",
 ) -> str:
     summary_block = (conversation_summary or "").strip()
     if not summary_block:
@@ -49,4 +76,5 @@ def render_system_prompt(
         conversation_summary=summary_block,
         retrieved_context=retrieved_context.strip() or "（暂无检索到相关典籍片段。）",
         current_intent=current_intent.strip() or "未分类",
+        intent_hint=intent_hint,
     )

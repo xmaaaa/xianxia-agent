@@ -5,7 +5,14 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 
-from app.agent.prompts import SUMMARY_MERGE_TEMPLATE, render_system_prompt
+from app.agent.prompts import (
+    EXPLORE_HINT,
+    INTENT_CLASSIFY_TEMPLATE,
+    STATUS_QUERY_HINT,
+    SUMMARY_MERGE_TEMPLATE,
+    VALID_INTENTS,
+    render_system_prompt,
+)
 from app.agent.state import AgentState
 from app.core.config import settings
 from app.memory.layered import (
@@ -20,6 +27,12 @@ from app.memory.long_term import load_character_profile
 from app.rag.retriever import retrieve_context_text
 
 logger = logging.getLogger("app.agent")
+
+_KEYWORD_RULES: list[tuple[str, tuple[str, ...]]] = [
+    ("skill_qa", ("功法", "修炼", "剑法", "诀", "术", "筑基", "金丹", "炼气", "逆天", "太清", "典籍", "丹方", "药理")),
+    ("explore", ("探索", "秘境", "进入", "查看周围", "环顾", "四周", "走进", "前往", "地图", "洞府")),
+    ("status_query", ("属性", "境界", "修为", "状态", "背包", "装备", "面板", "我的信息", "查看自身")),
+]
 
 
 def _last_human_text(messages: list) -> str:
@@ -53,18 +66,34 @@ def _last_turn_as_dicts(messages: list) -> Optional[tuple[dict, dict]]:
     return None
 
 
-def _infer_intent(user_text: str) -> str:
-    keys = ("功法", "修炼", "剑法", "诀", "术", "筑基", "金丹", "炼气", "逆天", "太清", "典籍")
-    if any(k in user_text for k in keys):
-        return "skill_qa"
+def _keyword_classify(user_text: str) -> Optional[str]:
+    for intent, keywords in _KEYWORD_RULES:
+        if any(k in user_text for k in keywords):
+            return intent
+    return None
+
+
+def _llm_classify(user_text: str, llm: ChatOpenAI) -> str:
+    prompt = INTENT_CLASSIFY_TEMPLATE.format(user_text=user_text)
+    comp = llm.bind(temperature=0.0, max_tokens=20)
+    resp = comp.invoke([HumanMessage(content=prompt)])
+    raw = str(getattr(resp, "content", "")).strip().lower()
+    for v in VALID_INTENTS:
+        if v in raw:
+            return v
     return "roleplay"
 
 
-def retrieve_context(state: AgentState) -> dict:
+def classify_intent(state: AgentState) -> dict:
     q = _last_human_text(state["messages"])
-    intent = _infer_intent(q)
-    ctx = retrieve_context_text(q) if intent == "skill_qa" else ""
-    return {"current_intent": intent, "retrieved_context": ctx}
+    intent = _keyword_classify(q)
+    if intent is None:
+        try:
+            intent = _llm_classify(q, _llm())
+        except Exception:
+            logger.exception("LLM intent classification failed, defaulting to roleplay")
+            intent = "roleplay"
+    return {"current_intent": intent}
 
 
 def _llm() -> ChatOpenAI:
@@ -79,6 +108,42 @@ def _llm() -> ChatOpenAI:
     if settings.openai_base_url:
         kwargs["base_url"] = settings.openai_base_url
     return ChatOpenAI(**kwargs)
+
+
+# ── Prepare nodes (one per intent) ──────────────────────────────────────────
+
+def prepare_roleplay(state: AgentState) -> dict:
+    return {"retrieved_context": ""}
+
+
+def prepare_skill_qa(state: AgentState) -> dict:
+    q = _last_human_text(state["messages"])
+    ctx = retrieve_context_text(q)
+    return {"retrieved_context": ctx}
+
+
+def prepare_explore(state: AgentState) -> dict:
+    return {"retrieved_context": ""}
+
+
+def prepare_status_query(state: AgentState, config: RunnableConfig) -> dict:
+    configurable = config.get("configurable") or {}
+    db = configurable.get("db")
+    if db is None:
+        return {"retrieved_context": ""}
+    cid = state["character_id"]
+    profile = load_character_profile(db, cid)
+    return {"retrieved_context": profile or ""}
+
+
+# ── Shared: build prompt, generate, save ────────────────────────────────────
+
+def _intent_hint(intent: str, retrieved_context: str) -> str:
+    if intent == "explore":
+        return EXPLORE_HINT
+    if intent == "status_query":
+        return STATUS_QUERY_HINT.format(status_data=retrieved_context or "（无法读取属性。）")
+    return ""
 
 
 def _merge_older_turn_into_summary(llm: ChatOpenAI, old_summary: str, dialog_excerpt: str) -> str:
@@ -135,11 +200,14 @@ def build_system_and_llm_messages(state: AgentState, config: RunnableConfig) -> 
         raise ValueError("RunnableConfig must include configurable['db'] (SQLAlchemy Session).")
     cid = state["character_id"]
     profile = load_character_profile(db, cid) or "无名散修，宗册未录。"
+    intent = state["current_intent"] or ""
+    hint = _intent_hint(intent, state["retrieved_context"])
     system_text = render_system_prompt(
         profile,
         state["retrieved_context"],
-        state["current_intent"],
+        intent,
         conversation_summary=state["conversation_summary"] or "",
+        intent_hint=hint,
     )
     return [SystemMessage(content=system_text), *state["messages"]]
 

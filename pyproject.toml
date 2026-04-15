@@ -1,6 +1,6 @@
 [project]
 name = "xianxia-agent"
-version = "0.2.0"
+version = "0.3.0"
 description = "AI-powered Xianxia (cultivation fantasy) RPG agent — LangGraph + RAG + FastAPI"
 readme = "README.md"
 license = {text = "MIT"}
