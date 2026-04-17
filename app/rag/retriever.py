@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
 
 from app.core.config import settings
 from app.rag.loader import load_skill_documents
@@ -14,24 +16,26 @@ _vectorstore: Any = None
 _retriever: Any = None
 
 
-def _has_valid_key() -> bool:
-    key = settings.openai_api_key
-    return bool(key and len(key) > 10)
+class _SentenceTransformerEmbeddings(Embeddings):
+    """Lightweight LangChain-compatible wrapper around sentence-transformers."""
+
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
+        hf_endpoint = os.environ.get("HF_ENDPOINT", "")
+        if not hf_endpoint:
+            os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+        from sentence_transformers import SentenceTransformer
+
+        self._model = SentenceTransformer(model_name)
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return self._model.encode(texts, show_progress_bar=False).tolist()
+
+    def embed_query(self, text: str) -> list[float]:
+        return self._model.encode([text], show_progress_bar=False)[0].tolist()
 
 
-def _embeddings():
-    if not _has_valid_key():
-        return None
-    from langchain_openai import OpenAIEmbeddings
-
-    kwargs: dict = {
-        "api_key": settings.openai_api_key,
-        "model": settings.openai_embedding_model,
-    }
-    base = settings.openai_embedding_base_url
-    if base:
-        kwargs["base_url"] = base
-    return OpenAIEmbeddings(**kwargs)
+def _embeddings() -> Embeddings:
+    return _SentenceTransformerEmbeddings()
 
 
 def get_vectorstore():
@@ -41,8 +45,6 @@ def get_vectorstore():
     from langchain_chroma import Chroma
 
     emb = _embeddings()
-    if emb is None:
-        return None
     settings.chroma_persist_dir.mkdir(parents=True, exist_ok=True)
     _vectorstore = Chroma(
         embedding_function=emb,
