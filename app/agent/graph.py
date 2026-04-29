@@ -3,6 +3,7 @@ from functools import lru_cache
 from langgraph.graph import END, START, StateGraph
 
 from app.agent.nodes import (
+    apply_game_delta,
     classify_intent,
     generate_response,
     prepare_explore,
@@ -30,6 +31,7 @@ def _build_graph():
     g.add_node("prepare_explore", prepare_explore)
     g.add_node("prepare_status_query", prepare_status_query)
     g.add_node("generate_response", generate_response)
+    g.add_node("apply_game_delta", apply_game_delta)
     g.add_node("save_memory", save_memory)
 
     g.add_edge(START, "classify_intent")
@@ -40,7 +42,8 @@ def _build_graph():
     )
     for node in _PREPARE_NODES.values():
         g.add_edge(node, "generate_response")
-    g.add_edge("generate_response", "save_memory")
+    g.add_edge("generate_response", "apply_game_delta")
+    g.add_edge("apply_game_delta", "save_memory")
     g.add_edge("save_memory", END)
 
     return g.compile()

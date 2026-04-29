@@ -12,3 +12,4 @@ class ChatResponse(BaseModel):
     reply: str
     retrieved_context: str = ""
     current_intent: str = ""
+    game_delta: dict = Field(default_factory=dict)

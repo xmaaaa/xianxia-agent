@@ -51,6 +51,7 @@ def _build_initial_state(req: ChatRequest) -> AgentState:
         conversation_summary=summary,
         current_intent="",
         retrieved_context="",
+        game_delta={},
     )
 
 
@@ -72,6 +73,7 @@ async def chat(req: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
         reply=reply,
         retrieved_context=result.get("retrieved_context", ""),
         current_intent=result.get("current_intent", ""),
+        game_delta=result.get("game_delta", {}),
     )
 
 

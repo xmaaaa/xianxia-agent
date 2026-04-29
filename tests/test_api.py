@@ -17,6 +17,9 @@ def test_create_and_list_character(client):
     assert data["name"] == "云游子"
     assert data["realm"] == "炼气初期"
     assert data["exp"] == 0
+    assert data["location"] == "青云镇"
+    assert data["inventory"] == []
+    assert data["event_log"] == []
     cid = data["id"]
 
     r = client.get("/api/v1/characters/", params={"user_id": "test-user-1"})
@@ -96,3 +99,33 @@ def test_chat_requires_openai_key(client, mock_redis, monkeypatch):
     })
     assert r.status_code == 503
     assert "语言模型" in r.json()["detail"]
+
+
+def test_chat_explore_updates_character_state(client, mock_redis, mock_openai):
+    payload = {
+        "user_id": "u-explore",
+        "name": "探幽子",
+        "sect": "太清宗",
+        "spirit_root": "木灵根",
+    }
+    r = client.post("/api/v1/characters/", json=payload)
+    cid = r.json()["id"]
+
+    r = client.post("/api/v1/chat/", json={
+        "user_id": "u-explore",
+        "character_id": cid,
+        "message": "探索一下周围有什么",
+        "stream": False,
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert data["current_intent"] == "explore"
+    assert data["game_delta"]["type"] == "explore"
+
+    r = client.get(f"/api/v1/characters/{cid}", params={"user_id": "u-explore"})
+    assert r.status_code == 200
+    char = r.json()
+    assert char["exp"] > 0
+    assert char["location"] != "青云镇"
+    assert char["inventory"]
+    assert char["event_log"]

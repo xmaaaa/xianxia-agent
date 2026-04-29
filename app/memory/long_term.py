@@ -16,5 +16,8 @@ def load_character_profile(db: Session, character_id: int) -> Optional[str]:
         f"所属门派：{row.sect}\n"
         f"灵根：{row.spirit_root}\n"
         f"当前境界：{row.realm}\n"
-        f"修为值：{row.exp}"
+        f"修为值：{row.exp}\n"
+        f"当前位置：{row.location}\n"
+        f"背包：{'、'.join(row.inventory) if row.inventory else '空'}\n"
+        f"近事：{'；'.join(row.event_log[-5:]) if row.event_log else '暂无'}"
     )

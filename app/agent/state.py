@@ -11,3 +11,4 @@ class AgentState(TypedDict):
     conversation_summary: str
     current_intent: str
     retrieved_context: str
+    game_delta: dict

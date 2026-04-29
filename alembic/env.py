@@ -1,3 +1,4 @@
+# ruff: noqa: I001
 import os
 import sys
 from logging.config import fileConfig
@@ -7,8 +8,8 @@ from sqlalchemy import create_engine, pool
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from app.core.config import settings  # noqa: E402
-from app.models import Base  # noqa: E402
+from app.core.config import settings
+from app.models import Base
 
 config = context.config
 if config.config_file_name is not None:

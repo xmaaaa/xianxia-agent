@@ -25,7 +25,7 @@ QUICK_COMMANDS = [
 
 
 def _client() -> httpx.Client:
-    return httpx.Client(base_url=API_BASE, timeout=120.0)
+    return httpx.Client(base_url=API_BASE, timeout=120.0, trust_env=False)
 
 
 def _api_get(path: str, **kwargs):
@@ -214,6 +214,8 @@ with col_info:
     if st.session_state.character_id:
         char_data = _fetch_character(st.session_state.user_id, st.session_state.character_id)
         if char_data:
+            inventory = "、".join(char_data.get("inventory") or []) or "空"
+            recent_events = char_data.get("event_log") or []
             st.subheader("角色面板")
             st.markdown(f"""
 | | |
@@ -223,7 +225,13 @@ with col_info:
 | **灵根** | {char_data['spirit_root']} |
 | **境界** | {char_data['realm']} |
 | **修为** | {char_data['exp']} |
+| **位置** | {char_data.get('location', '青云镇')} |
+| **背包** | {inventory} |
 """)
+            if recent_events:
+                with st.expander("近事", expanded=False):
+                    for item in recent_events[-5:]:
+                        st.write(f"- {item}")
         st.divider()
 
     st.subheader("会话状态")

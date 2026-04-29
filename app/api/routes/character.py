@@ -25,6 +25,9 @@ def create_character(payload: CharacterCreate, db: Session = Depends(get_db)) ->
         spirit_root=payload.spirit_root,
         realm=payload.realm,
         exp=payload.exp,
+        location=payload.location,
+        inventory=payload.inventory,
+        event_log=payload.event_log,
     )
     db.add(row)
     db.commit()

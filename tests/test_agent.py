@@ -5,6 +5,7 @@ from langchain_core.messages import HumanMessage
 from app.agent.nodes import (
     _keyword_classify,
     _llm_classify,
+    apply_game_delta,
     classify_intent,
     prepare_explore,
     prepare_roleplay,
@@ -12,6 +13,7 @@ from app.agent.nodes import (
 )
 from app.agent.prompts import render_system_prompt
 from app.agent.state import AgentState
+from app.models.character import Character
 
 # ── keyword classification ──────────────────────────────────────────────────
 
@@ -133,7 +135,45 @@ def test_prepare_explore_returns_empty_context():
         "current_intent": "explore",
         "retrieved_context": "",
     }
-    assert prepare_explore(state) == {"retrieved_context": ""}
+    out = prepare_explore(state)
+    assert "本次探索" in out["retrieved_context"]
+    assert out["game_delta"]["type"] == "explore"
+    assert out["game_delta"]["exp_delta"] > 0
+
+
+def test_apply_game_delta_updates_character(db_session):
+    row = Character(
+        user_id="u1",
+        name="云游子",
+        sect="太清宗",
+        spirit_root="水木双灵根",
+    )
+    db_session.add(row)
+    db_session.commit()
+    db_session.refresh(row)
+
+    state: AgentState = {
+        "user_id": "u1",
+        "character_id": row.id,
+        "messages": [HumanMessage(content="探索秘境")],
+        "conversation_summary": "",
+        "current_intent": "explore",
+        "retrieved_context": "",
+        "game_delta": {
+            "type": "explore",
+            "exp_delta": 7,
+            "location": "废弃洞府",
+            "items_add": ["残破玉简"],
+            "event": "在废弃洞府发现残破玉简。",
+        },
+    }
+    apply_game_delta(state, {"configurable": {"db": db_session}})
+    db_session.refresh(row)
+
+    assert row.exp == 7
+    assert row.location == "废弃洞府"
+    assert row.inventory == ["残破玉简"]
+    assert row.event_log == ["在废弃洞府发现残破玉简。"]
 
 
 # ── render_system_prompt ────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import logging
+from hashlib import sha1
 from typing import Optional
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -24,9 +25,31 @@ from app.memory.layered import (
     save_layered_session,
 )
 from app.memory.long_term import load_character_profile
+from app.models.character import Character
 from app.rag.retriever import retrieve_context_text
 
 logger = logging.getLogger("app.agent")
+
+_EXPLORE_SCENES: tuple[dict, ...] = (
+    {
+        "location": "青云镇外竹林",
+        "exp_delta": 6,
+        "item": "凝气草",
+        "event": "在青云镇外竹林采得凝气草，丹田受灵气一洗。",
+    },
+    {
+        "location": "寒潭石径",
+        "exp_delta": 8,
+        "item": "寒潭水珠",
+        "event": "沿寒潭石径探查，收起一枚寒潭水珠。",
+    },
+    {
+        "location": "废弃洞府",
+        "exp_delta": 10,
+        "item": "残破玉简",
+        "event": "在废弃洞府发现残破玉简，隐约记下一缕古意。",
+    },
+)
 
 _KEYWORD_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("skill_qa", ("功法", "修炼", "剑法", "诀", "术", "筑基", "金丹", "炼气", "逆天", "太清", "典籍", "丹方", "药理")),
@@ -123,7 +146,25 @@ def prepare_skill_qa(state: AgentState) -> dict:
 
 
 def prepare_explore(state: AgentState) -> dict:
-    return {"retrieved_context": ""}
+    q = _last_human_text(state["messages"])
+    seed = f"{state['user_id']}:{state['character_id']}:{q}"
+    idx = int(sha1(seed.encode("utf-8")).hexdigest(), 16) % len(_EXPLORE_SCENES)
+    scene = _EXPLORE_SCENES[idx]
+    game_delta = {
+        "type": "explore",
+        "exp_delta": scene["exp_delta"],
+        "location": scene["location"],
+        "items_add": [scene["item"]],
+        "event": scene["event"],
+    }
+    ctx = (
+        "本次探索将产生以下可落账结果：\n"
+        f"- 地点：{game_delta['location']}\n"
+        f"- 修为增加：{game_delta['exp_delta']}\n"
+        f"- 获得物品：{scene['item']}\n"
+        f"- 事件：{game_delta['event']}"
+    )
+    return {"retrieved_context": ctx, "game_delta": game_delta}
 
 
 def prepare_status_query(state: AgentState, config: RunnableConfig) -> dict:
@@ -221,6 +262,41 @@ async def generate_response(state: AgentState, config: RunnableConfig) -> dict:
         if c:
             chunks.append(c)
     return {"messages": [AIMessage(content="".join(chunks))]}
+
+
+def apply_game_delta(state: AgentState, config: RunnableConfig) -> dict:
+    delta = state.get("game_delta") or {}
+    if not delta:
+        return {}
+
+    configurable = config.get("configurable") or {}
+    db = configurable.get("db")
+    if db is None:
+        raise ValueError("RunnableConfig must include configurable['db'] (SQLAlchemy Session).")
+
+    row = db.get(Character, state["character_id"])
+    if row is None or row.user_id != state["user_id"]:
+        logger.warning("apply_game_delta: character not found or not owned")
+        return {}
+
+    exp_delta = int(delta.get("exp_delta") or 0)
+    if exp_delta:
+        row.exp = max(0, row.exp + exp_delta)
+
+    location = str(delta.get("location") or "").strip()
+    if location:
+        row.location = location
+
+    items = [str(x).strip() for x in delta.get("items_add", []) if str(x).strip()]
+    if items:
+        row.inventory = [*(row.inventory or []), *items]
+
+    event = str(delta.get("event") or "").strip()
+    if event:
+        row.event_log = [*(row.event_log or []), event][-20:]
+
+    db.commit()
+    return {}
 
 
 def save_memory(state: AgentState) -> dict:
