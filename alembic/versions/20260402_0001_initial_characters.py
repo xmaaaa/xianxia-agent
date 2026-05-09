@@ -29,7 +29,12 @@ def upgrade() -> None:
         sa.Column("spirit_root", sa.String(length=256), nullable=False),
         sa.Column("realm", sa.String(length=64), server_default="炼气初期", nullable=False),
         sa.Column("exp", sa.Integer(), server_default="0", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_characters_user_id", "characters", ["user_id"], unique=False)

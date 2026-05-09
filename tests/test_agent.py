@@ -17,6 +17,7 @@ from app.models.character import Character
 
 # ── keyword classification ──────────────────────────────────────────────────
 
+
 def test_keyword_classify_skill_qa():
     assert _keyword_classify("太清剑法要如何修炼？") == "skill_qa"
     assert _keyword_classify("逆天诀的境界要求是什么？") == "skill_qa"
@@ -42,6 +43,7 @@ def test_keyword_classify_returns_none_for_ambiguous():
 
 # ── LLM fallback classification ─────────────────────────────────────────────
 
+
 def test_llm_classify_parses_valid_intent():
     mock_llm = MagicMock()
     fake_resp = MagicMock()
@@ -61,6 +63,7 @@ def test_llm_classify_defaults_to_roleplay_on_garbage():
 
 
 # ── classify_intent node ────────────────────────────────────────────────────
+
 
 def test_classify_intent_keyword_hit():
     state: AgentState = {
@@ -98,6 +101,7 @@ def test_classify_intent_llm_fallback(mock_llm_fn):
 
 
 # ── prepare nodes ───────────────────────────────────────────────────────────
+
 
 def test_prepare_roleplay_returns_empty_context():
     state: AgentState = {
@@ -177,6 +181,7 @@ def test_apply_game_delta_updates_character(db_session):
 
 
 # ── render_system_prompt ────────────────────────────────────────────────────
+
 
 def test_render_system_prompt_includes_profile_and_rag():
     text = render_system_prompt("测试修士档案", "测试典籍摘录", "skill_qa")

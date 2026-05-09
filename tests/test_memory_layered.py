@@ -23,7 +23,9 @@ def test_parse_legacy_list_truncates_to_cap(monkeypatch):
 
 def test_parse_v2_roundtrip():
     summary, msgs = parse_stored_session(
-        dump_stored_session("提要", [{"role": "user", "content": "a"}, {"role": "assistant", "content": "b"}])
+        dump_stored_session(
+            "提要", [{"role": "user", "content": "a"}, {"role": "assistant", "content": "b"}]
+        )
     )
     assert summary == "提要"
     assert len(msgs) == 2

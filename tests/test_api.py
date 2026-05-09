@@ -91,12 +91,15 @@ def test_chat_requires_openai_key(client, mock_redis, monkeypatch):
     r = client.post("/api/v1/characters/", json=payload)
     cid = r.json()["id"]
 
-    r = client.post("/api/v1/chat/", json={
-        "user_id": "u1",
-        "character_id": cid,
-        "message": "你好",
-        "stream": False,
-    })
+    r = client.post(
+        "/api/v1/chat/",
+        json={
+            "user_id": "u1",
+            "character_id": cid,
+            "message": "你好",
+            "stream": False,
+        },
+    )
     assert r.status_code == 503
     assert "语言模型" in r.json()["detail"]
 
@@ -111,12 +114,15 @@ def test_chat_explore_updates_character_state(client, mock_redis, mock_openai):
     r = client.post("/api/v1/characters/", json=payload)
     cid = r.json()["id"]
 
-    r = client.post("/api/v1/chat/", json={
-        "user_id": "u-explore",
-        "character_id": cid,
-        "message": "探索一下周围有什么",
-        "stream": False,
-    })
+    r = client.post(
+        "/api/v1/chat/",
+        json={
+            "user_id": "u-explore",
+            "character_id": cid,
+            "message": "探索一下周围有什么",
+            "stream": False,
+        },
+    )
     assert r.status_code == 200
     data = r.json()
     assert data["current_intent"] == "explore"

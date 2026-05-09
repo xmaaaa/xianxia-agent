@@ -195,11 +195,13 @@ with col_chat:
 
         if full:
             st.session_state.chat_log.append({"role": "user", "content": prompt})
-            st.session_state.chat_log.append({
-                "role": "assistant",
-                "content": full,
-                "intent": intent,
-            })
+            st.session_state.chat_log.append(
+                {
+                    "role": "assistant",
+                    "content": full,
+                    "intent": intent,
+                }
+            )
             st.session_state.last_intent = intent
             st.session_state.last_ctx = context
             if len(st.session_state.chat_log) > MAX_CHAT_LOG:
@@ -220,12 +222,12 @@ with col_info:
             st.markdown(f"""
 | | |
 |---|---|
-| **道号** | {char_data['name']} |
-| **门派** | {char_data['sect']} |
-| **灵根** | {char_data['spirit_root']} |
-| **境界** | {char_data['realm']} |
-| **修为** | {char_data['exp']} |
-| **位置** | {char_data.get('location', '青云镇')} |
+| **道号** | {char_data["name"]} |
+| **门派** | {char_data["sect"]} |
+| **灵根** | {char_data["spirit_root"]} |
+| **境界** | {char_data["realm"]} |
+| **修为** | {char_data["exp"]} |
+| **位置** | {char_data.get("location", "青云镇")} |
 | **背包** | {inventory} |
 """)
             if recent_events:

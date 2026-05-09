@@ -116,9 +116,15 @@ def count_turns(messages: list[dict[str, Any]]) -> int:
     return n
 
 
-def pop_oldest_turn(messages: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def pop_oldest_turn(
+    messages: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """拆出最旧的一轮 (user, assistant)，返回 (turn_pair, remaining)。"""
-    if len(messages) >= 2 and messages[0].get("role") == "user" and messages[1].get("role") == "assistant":
+    if (
+        len(messages) >= 2
+        and messages[0].get("role") == "user"
+        and messages[1].get("role") == "assistant"
+    ):
         turn = messages[:2]
         rest = messages[2:]
         return turn, rest

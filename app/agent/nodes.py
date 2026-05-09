@@ -52,9 +52,32 @@ _EXPLORE_SCENES: tuple[dict, ...] = (
 )
 
 _KEYWORD_RULES: list[tuple[str, tuple[str, ...]]] = [
-    ("skill_qa", ("功法", "修炼", "剑法", "诀", "术", "筑基", "金丹", "炼气", "逆天", "太清", "典籍", "丹方", "药理")),
-    ("explore", ("探索", "秘境", "进入", "查看周围", "环顾", "四周", "走进", "前往", "地图", "洞府")),
-    ("status_query", ("属性", "境界", "修为", "状态", "背包", "装备", "面板", "我的信息", "查看自身")),
+    (
+        "skill_qa",
+        (
+            "功法",
+            "修炼",
+            "剑法",
+            "诀",
+            "术",
+            "筑基",
+            "金丹",
+            "炼气",
+            "逆天",
+            "太清",
+            "典籍",
+            "丹方",
+            "药理",
+        ),
+    ),
+    (
+        "explore",
+        ("探索", "秘境", "进入", "查看周围", "环顾", "四周", "走进", "前往", "地图", "洞府"),
+    ),
+    (
+        "status_query",
+        ("属性", "境界", "修为", "状态", "背包", "装备", "面板", "我的信息", "查看自身"),
+    ),
 ]
 
 
@@ -71,14 +94,10 @@ def _last_turn_as_dicts(messages: list) -> Optional[tuple[dict, dict]]:
     last_ai = ""
     last_human = ""
     for m in reversed(messages):
-        if not last_ai and (
-            isinstance(m, AIMessage) or getattr(m, "type", None) == "ai"
-        ):
+        if not last_ai and (isinstance(m, AIMessage) or getattr(m, "type", None) == "ai"):
             last_ai = str(m.content)
             continue
-        if last_ai and (
-            isinstance(m, HumanMessage) or getattr(m, "type", None) == "human"
-        ):
+        if last_ai and (isinstance(m, HumanMessage) or getattr(m, "type", None) == "human"):
             last_human = str(m.content)
             break
     if last_human and last_ai:
@@ -135,6 +154,7 @@ def _llm() -> ChatOpenAI:
 
 # ── Prepare nodes (one per intent) ──────────────────────────────────────────
 
+
 def prepare_roleplay(state: AgentState) -> dict:
     return {"retrieved_context": ""}
 
@@ -179,6 +199,7 @@ def prepare_status_query(state: AgentState, config: RunnableConfig) -> dict:
 
 # ── Shared: build prompt, generate, save ────────────────────────────────────
 
+
 def _intent_hint(intent: str, retrieved_context: str) -> str:
     if intent == "explore":
         return EXPLORE_HINT
@@ -209,7 +230,9 @@ def _should_compress(recent: list[dict]) -> bool:
     return messages_token_count(recent) > settings.memory_max_tokens
 
 
-def fold_recent_until_cap(llm: ChatOpenAI, summary: str, recent: list[dict]) -> tuple[str, list[dict]]:
+def fold_recent_until_cap(
+    llm: ChatOpenAI, summary: str, recent: list[dict]
+) -> tuple[str, list[dict]]:
     recent = list(recent)
     s = summary
     while _should_compress(recent):
