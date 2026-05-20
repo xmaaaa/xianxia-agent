@@ -137,6 +137,10 @@ Phase 2d 在 Phase 2c 角色状态落账之上加入独立游戏行动系统：
 
 核心目录与职责与仓库内 `app/`、`frontend/`、`alembic/`、`tests/` 一致；意图分类、prepare 节点与游戏状态落账在 `app/agent/nodes.py`，规则引擎在 `app/game/engine.py`，Graph 条件边和落账节点串联在 `app/agent/graph.py`，所有 prompt 模板在 `app/agent/prompts.py`。分层会话读写见 `app/memory/layered.py`。
 
+## 路线图
+
+Phase 2 已完成核心 RPG Agent 闭环。下一阶段进入 **Phase 3：前端产品化与微信小程序**，路线详见 `docs/roadmap-phase3-frontend-wechat.md`。当前建议优先执行 `Phase 3a: Taro 前端脚手架`，保留 Streamlit 作为本地调试入口。
+
 ## 许可证
 
 见仓库根目录 `LICENSE`。
