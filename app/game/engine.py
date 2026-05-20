@@ -71,7 +71,9 @@ def _realm_delta(snapshot: CharacterSnapshot, exp_delta: int) -> dict:
 
 
 def _stable_scene(snapshot: CharacterSnapshot, user_text: str) -> dict:
-    seed = f"{snapshot.user_id}:{snapshot.character_id}:{snapshot.exp}:{snapshot.location}:{user_text}"
+    seed = (
+        f"{snapshot.user_id}:{snapshot.character_id}:{snapshot.exp}:{snapshot.location}:{user_text}"
+    )
     idx = int(sha1(seed.encode("utf-8")).hexdigest(), 16) % len(EXPLORE_SCENES)
     return EXPLORE_SCENES[idx]
 

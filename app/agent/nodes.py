@@ -101,7 +101,9 @@ def _last_turn_as_dicts(messages: list) -> Optional[tuple[dict, dict]]:
 
 
 def _keyword_classify(user_text: str) -> Optional[str]:
-    if "修炼" in user_text and any(q in user_text for q in ("如何", "怎么", "要求", "是什么", "为何")):
+    if "修炼" in user_text and any(
+        q in user_text for q in ("如何", "怎么", "要求", "是什么", "为何")
+    ):
         return "skill_qa"
     for intent, keywords in _KEYWORD_RULES:
         if any(k in user_text for k in keywords):
