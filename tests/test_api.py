@@ -135,3 +135,36 @@ def test_chat_explore_updates_character_state(client, mock_redis, mock_openai):
     assert char["location"] != "青云镇"
     assert char["inventory"]
     assert char["event_log"]
+
+
+def test_chat_cultivate_can_break_through(client, mock_redis, mock_openai):
+    payload = {
+        "user_id": "u-cultivate",
+        "name": "炼气子",
+        "sect": "太清宗",
+        "spirit_root": "木灵根",
+        "exp": 15,
+    }
+    r = client.post("/api/v1/characters/", json=payload)
+    cid = r.json()["id"]
+
+    r = client.post(
+        "/api/v1/chat/",
+        json={
+            "user_id": "u-cultivate",
+            "character_id": cid,
+            "message": "我要开始修炼",
+            "stream": False,
+        },
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["current_intent"] == "cultivate"
+    assert data["game_delta"]["realm"] == "炼气中期"
+
+    r = client.get(f"/api/v1/characters/{cid}", params={"user_id": "u-cultivate"})
+    assert r.status_code == 200
+    char = r.json()
+    assert char["exp"] == 27
+    assert char["realm"] == "炼气中期"
+    assert char["event_log"]

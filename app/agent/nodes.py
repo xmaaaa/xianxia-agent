@@ -1,5 +1,4 @@
 import logging
-from hashlib import sha1
 from typing import Optional
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -8,6 +7,7 @@ from langchain_openai import ChatOpenAI
 
 from app.agent.prompts import (
     EXPLORE_HINT,
+    GAME_ACTION_HINT,
     INTENT_CLASSIFY_TEMPLATE,
     STATUS_QUERY_HINT,
     SUMMARY_MERGE_TEMPLATE,
@@ -16,6 +16,7 @@ from app.agent.prompts import (
 )
 from app.agent.state import AgentState
 from app.core.config import settings
+from app.game.engine import CharacterSnapshot, format_delta_context, plan_action
 from app.memory.layered import (
     count_turns,
     format_turn_for_summary,
@@ -30,28 +31,19 @@ from app.rag.retriever import retrieve_context_text
 
 logger = logging.getLogger("app.agent")
 
-_EXPLORE_SCENES: tuple[dict, ...] = (
-    {
-        "location": "青云镇外竹林",
-        "exp_delta": 6,
-        "item": "凝气草",
-        "event": "在青云镇外竹林采得凝气草，丹田受灵气一洗。",
-    },
-    {
-        "location": "寒潭石径",
-        "exp_delta": 8,
-        "item": "寒潭水珠",
-        "event": "沿寒潭石径探查，收起一枚寒潭水珠。",
-    },
-    {
-        "location": "废弃洞府",
-        "exp_delta": 10,
-        "item": "残破玉简",
-        "event": "在废弃洞府发现残破玉简，隐约记下一缕古意。",
-    },
-)
-
 _KEYWORD_RULES: list[tuple[str, tuple[str, ...]]] = [
+    (
+        "cultivate",
+        ("打坐", "吐纳", "闭关", "开始修炼", "修炼一会", "提升修为", "运功"),
+    ),
+    (
+        "rest",
+        ("休息", "歇息", "调息", "恢复", "养伤"),
+    ),
+    (
+        "use_item",
+        ("使用", "服用", "吃下", "炼化", "消耗"),
+    ),
     (
         "skill_qa",
         (
@@ -109,6 +101,8 @@ def _last_turn_as_dicts(messages: list) -> Optional[tuple[dict, dict]]:
 
 
 def _keyword_classify(user_text: str) -> Optional[str]:
+    if "修炼" in user_text and any(q in user_text for q in ("如何", "怎么", "要求", "是什么", "为何")):
+        return "skill_qa"
     for intent, keywords in _KEYWORD_RULES:
         if any(k in user_text for k in keywords):
             return intent
@@ -165,25 +159,28 @@ def prepare_skill_qa(state: AgentState) -> dict:
     return {"retrieved_context": ctx}
 
 
-def prepare_explore(state: AgentState) -> dict:
+def _snapshot_from_config(state: AgentState, config: Optional[RunnableConfig]) -> CharacterSnapshot:
+    configurable = (config or {}).get("configurable") or {}
+    db = configurable.get("db")
+    if db is not None:
+        row = db.get(Character, state["character_id"])
+        if row is not None and row.user_id == state["user_id"]:
+            return CharacterSnapshot.from_model(row)
+    return CharacterSnapshot(user_id=state["user_id"], character_id=state["character_id"])
+
+
+def prepare_explore(state: AgentState, config: Optional[RunnableConfig] = None) -> dict:
     q = _last_human_text(state["messages"])
-    seed = f"{state['user_id']}:{state['character_id']}:{q}"
-    idx = int(sha1(seed.encode("utf-8")).hexdigest(), 16) % len(_EXPLORE_SCENES)
-    scene = _EXPLORE_SCENES[idx]
-    game_delta = {
-        "type": "explore",
-        "exp_delta": scene["exp_delta"],
-        "location": scene["location"],
-        "items_add": [scene["item"]],
-        "event": scene["event"],
-    }
-    ctx = (
-        "本次探索将产生以下可落账结果：\n"
-        f"- 地点：{game_delta['location']}\n"
-        f"- 修为增加：{game_delta['exp_delta']}\n"
-        f"- 获得物品：{scene['item']}\n"
-        f"- 事件：{game_delta['event']}"
-    )
+    game_delta = plan_action("explore", _snapshot_from_config(state, config), q)
+    ctx = format_delta_context(game_delta)
+    return {"retrieved_context": ctx, "game_delta": game_delta}
+
+
+def prepare_game_action(state: AgentState, config: Optional[RunnableConfig] = None) -> dict:
+    q = _last_human_text(state["messages"])
+    intent = state["current_intent"] or ""
+    game_delta = plan_action(intent, _snapshot_from_config(state, config), q)
+    ctx = format_delta_context(game_delta)
     return {"retrieved_context": ctx, "game_delta": game_delta}
 
 
@@ -203,6 +200,8 @@ def prepare_status_query(state: AgentState, config: RunnableConfig) -> dict:
 def _intent_hint(intent: str, retrieved_context: str) -> str:
     if intent == "explore":
         return EXPLORE_HINT
+    if intent in {"cultivate", "rest", "use_item"}:
+        return GAME_ACTION_HINT
     if intent == "status_query":
         return STATUS_QUERY_HINT.format(status_data=retrieved_context or "（无法读取属性。）")
     return ""
@@ -306,6 +305,10 @@ def apply_game_delta(state: AgentState, config: RunnableConfig) -> dict:
     if exp_delta:
         row.exp = max(0, row.exp + exp_delta)
 
+    realm = str(delta.get("realm") or "").strip()
+    if realm:
+        row.realm = realm
+
     location = str(delta.get("location") or "").strip()
     if location:
         row.location = location
@@ -313,6 +316,14 @@ def apply_game_delta(state: AgentState, config: RunnableConfig) -> dict:
     items = [str(x).strip() for x in delta.get("items_add", []) if str(x).strip()]
     if items:
         row.inventory = [*(row.inventory or []), *items]
+
+    remove_items = [str(x).strip() for x in delta.get("items_remove", []) if str(x).strip()]
+    if remove_items:
+        inventory = list(row.inventory or [])
+        for item in remove_items:
+            if item in inventory:
+                inventory.remove(item)
+        row.inventory = inventory
 
     event = str(delta.get("event") or "").strip()
     if event:

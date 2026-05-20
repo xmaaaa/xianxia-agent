@@ -8,6 +8,7 @@ from app.agent.nodes import (
     apply_game_delta,
     classify_intent,
     prepare_explore,
+    prepare_game_action,
     prepare_roleplay,
     prepare_skill_qa,
 )
@@ -34,6 +35,12 @@ def test_keyword_classify_status():
     assert _keyword_classify("查看自身属性") == "status_query"
     assert _keyword_classify("我现在是什么境界") == "status_query"
     assert _keyword_classify("打开面板") == "status_query"
+
+
+def test_keyword_classify_game_actions():
+    assert _keyword_classify("我要开始修炼") == "cultivate"
+    assert _keyword_classify("先调息片刻") == "rest"
+    assert _keyword_classify("服用凝气草") == "use_item"
 
 
 def test_keyword_classify_returns_none_for_ambiguous():
@@ -130,7 +137,7 @@ def test_prepare_skill_qa_calls_rag(_mock_rt):
     _mock_rt.assert_called_once()
 
 
-def test_prepare_explore_returns_empty_context():
+def test_prepare_explore_returns_action_context():
     state: AgentState = {
         "user_id": "u1",
         "character_id": 1,
@@ -140,9 +147,37 @@ def test_prepare_explore_returns_empty_context():
         "retrieved_context": "",
     }
     out = prepare_explore(state)
-    assert "本次探索" in out["retrieved_context"]
+    assert "本次行动" in out["retrieved_context"]
     assert out["game_delta"]["type"] == "explore"
     assert out["game_delta"]["exp_delta"] > 0
+
+
+def test_prepare_game_action_uses_character_state(db_session):
+    row = Character(
+        user_id="u1",
+        name="云游子",
+        sect="太清宗",
+        spirit_root="水木双灵根",
+        exp=15,
+        inventory=["凝气草"],
+    )
+    db_session.add(row)
+    db_session.commit()
+    db_session.refresh(row)
+
+    state: AgentState = {
+        "user_id": "u1",
+        "character_id": row.id,
+        "messages": [HumanMessage(content="开始修炼")],
+        "conversation_summary": "",
+        "current_intent": "cultivate",
+        "retrieved_context": "",
+    }
+    out = prepare_game_action(state, {"configurable": {"db": db_session}})
+
+    assert out["game_delta"]["type"] == "cultivate"
+    assert out["game_delta"]["realm"] == "炼气中期"
+    assert "境界变化：炼气中期" in out["retrieved_context"]
 
 
 def test_apply_game_delta_updates_character(db_session):
@@ -178,6 +213,43 @@ def test_apply_game_delta_updates_character(db_session):
     assert row.location == "废弃洞府"
     assert row.inventory == ["残破玉简"]
     assert row.event_log == ["在废弃洞府发现残破玉简。"]
+
+
+def test_apply_game_delta_handles_breakthrough_and_item_removal(db_session):
+    row = Character(
+        user_id="u1",
+        name="云游子",
+        sect="太清宗",
+        spirit_root="水木双灵根",
+        exp=18,
+        inventory=["凝气草", "残破玉简"],
+    )
+    db_session.add(row)
+    db_session.commit()
+    db_session.refresh(row)
+
+    state: AgentState = {
+        "user_id": "u1",
+        "character_id": row.id,
+        "messages": [HumanMessage(content="服用凝气草")],
+        "conversation_summary": "",
+        "current_intent": "use_item",
+        "retrieved_context": "",
+        "game_delta": {
+            "type": "use_item",
+            "exp_delta": 5,
+            "items_remove": ["凝气草"],
+            "realm": "炼气中期",
+            "event": "使用凝气草后，灵气入体。",
+        },
+    }
+    apply_game_delta(state, {"configurable": {"db": db_session}})
+    db_session.refresh(row)
+
+    assert row.exp == 23
+    assert row.realm == "炼气中期"
+    assert row.inventory == ["残破玉简"]
+    assert row.event_log == ["使用凝气草后，灵气入体。"]
 
 
 # ── render_system_prompt ────────────────────────────────────────────────────

@@ -1,4 +1,12 @@
-VALID_INTENTS = ("roleplay", "skill_qa", "explore", "status_query")
+VALID_INTENTS = (
+    "roleplay",
+    "skill_qa",
+    "explore",
+    "cultivate",
+    "rest",
+    "use_item",
+    "status_query",
+)
 
 INTENT_CLASSIFY_TEMPLATE = """\
 你是意图分类器。根据玩家最新一句话，输出一个意图标签（仅输出标签本身，不要加任何解释）。
@@ -7,6 +15,9 @@ INTENT_CLASSIFY_TEMPLATE = """\
 - roleplay — 角色扮演、日常对话、闲聊、剧情推进
 - skill_qa — 询问功法、修炼方法、境界知识、丹方药理
 - explore — 探索场景、进入秘境、查看周围环境、寻找物品
+- cultivate — 主动打坐、吐纳、闭关、修炼以增长修为
+- rest — 休息、调息、恢复状态
+- use_item — 使用背包物品、服用药草丹药、消耗道具
 - status_query — 查看自身属性、境界、修为值、背包、装备
 
 玩家说：{user_text}
@@ -18,6 +29,11 @@ EXPLORE_HINT = """\
 ## 探索模式补充指令
 根据修士当前境界和所在场景，描述他看到/感知到的环境，可包含：地形、灵气浓度、可能的机缘或危险。\
 如果「典籍摘录」中列出本次探索的可落账结果，回复必须自然提及地点、获得物品与修为变化。"""
+
+GAME_ACTION_HINT = """\
+
+## 行动模式补充指令
+「典籍摘录」中列出了本次行动的可落账结果。回复必须自然提及事件结果；若有修为、境界或物品变化，也要让玩家明确知道。"""
 
 STATUS_QUERY_HINT = """\
 

@@ -7,6 +7,7 @@ from app.agent.nodes import (
     classify_intent,
     generate_response,
     prepare_explore,
+    prepare_game_action,
     prepare_roleplay,
     prepare_skill_qa,
     prepare_status_query,
@@ -18,6 +19,9 @@ _PREPARE_NODES = {
     "roleplay": "prepare_roleplay",
     "skill_qa": "prepare_skill_qa",
     "explore": "prepare_explore",
+    "cultivate": "prepare_game_action",
+    "rest": "prepare_game_action",
+    "use_item": "prepare_game_action",
     "status_query": "prepare_status_query",
 }
 
@@ -29,6 +33,7 @@ def _build_graph():
     g.add_node("prepare_roleplay", prepare_roleplay)
     g.add_node("prepare_skill_qa", prepare_skill_qa)
     g.add_node("prepare_explore", prepare_explore)
+    g.add_node("prepare_game_action", prepare_game_action)
     g.add_node("prepare_status_query", prepare_status_query)
     g.add_node("generate_response", generate_response)
     g.add_node("apply_game_delta", apply_game_delta)
@@ -40,7 +45,7 @@ def _build_graph():
         lambda s: s["current_intent"],
         _PREPARE_NODES,
     )
-    for node in _PREPARE_NODES.values():
+    for node in set(_PREPARE_NODES.values()):
         g.add_edge(node, "generate_response")
     g.add_edge("generate_response", "apply_game_delta")
     g.add_edge("apply_game_delta", "save_memory")

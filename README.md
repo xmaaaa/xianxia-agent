@@ -1,6 +1,6 @@
-# 修仙 AI Agent（Phase 2c）
+# 修仙 AI Agent（Phase 2d）
 
-基于 **LangGraph** 编排、**Chroma** 本地向量库与 **FastAPI** 的修仙题材对话 Agent：玩家创建角色后与「叙事之灵」对话。Graph 内部通过 **意图路由**（关键词优先 + LLM fallback）分发到不同处理分支（角色扮演 / 功法问答 / 场景探索 / 状态查询），各分支做差异化上下文准备后统一生成。Phase 2c 新增了可落账的角色游戏状态：探索会写入当前位置、背包、近事与修为变化。会话记忆在 **Redis** 中分层存储：**滚动摘要** + **近期原文轮次**。MVP 前端为 **Streamlit**，流式与非流式共用同一张 LangGraph。
+基于 **LangGraph** 编排、**Chroma** 本地向量库与 **FastAPI** 的修仙题材对话 Agent：玩家创建角色后与「叙事之灵」对话。Graph 内部通过 **意图路由**（关键词优先 + LLM fallback）分发到不同处理分支（角色扮演 / 功法问答 / 场景探索 / 修炼 / 调息 / 使用物品 / 状态查询），各分支做差异化上下文准备后统一生成。Phase 2d 新增了独立游戏规则引擎：探索、修炼、调息和使用物品会产生可落账的角色状态变化，支持修为增长、境界突破、背包增减和近事记录。会话记忆在 **Redis** 中分层存储：**滚动摘要** + **近期原文轮次**。MVP 前端为 **Streamlit**，流式与非流式共用同一张 LangGraph。
 
 **建议运行环境：Python 3.11+**（依赖栈按 3.11 测试；生产请固定解释器版本。）
 
@@ -125,16 +125,17 @@ pytest -q
 | `MEMORY_SUMMARY_MAX_CHARS` | `1200` | 滚动摘要目标最大字数 |
 | `MEMORY_MAX_TOKENS` | `4000` | 近期消息 token 上限（轮次与 token 双门槛，先到先触发压缩） |
 
-## 阶段说明（Phase 2c）
+## 阶段说明（Phase 2d）
 
-Phase 2c 在 Phase 2b 意图路由之上加入角色游戏状态落账：
+Phase 2d 在 Phase 2c 角色状态落账之上加入独立游戏行动系统：
 
 - `characters` 表新增 `location`、`inventory`、`event_log` 字段，迁移见 `alembic/versions/20260425_0002_character_game_state.py`。
-- `prepare_explore` 会生成确定性的探索结果与 `game_delta`，`apply_game_delta` 负责把修为、位置、物品、近事写入 PostgreSQL。
+- `app/game/engine.py` 负责确定性的行动规则：探索、修炼、调息、使用物品、经验阈值和境界突破。
+- `prepare_explore` 与 `prepare_game_action` 会生成 `game_delta`，`apply_game_delta` 负责把修为、境界、位置、物品、近事写入 PostgreSQL。
 - 状态查询会读取最新角色档案，包含位置、背包与近事。
-- Streamlit 角色面板展示位置、背包和近事；本地 API 客户端关闭环境代理继承，避免本机请求被代理层误伤。
+- Streamlit 角色面板展示位置、背包和近事，快捷行动支持探索、查看属性、修炼与调息；本地 API 客户端关闭环境代理继承，避免本机请求被代理层误伤。
 
-核心目录与职责与仓库内 `app/`、`frontend/`、`alembic/`、`tests/` 一致；意图分类、prepare 节点与游戏状态落账在 `app/agent/nodes.py`，Graph 条件边和落账节点串联在 `app/agent/graph.py`，所有 prompt 模板在 `app/agent/prompts.py`。分层会话读写见 `app/memory/layered.py`。
+核心目录与职责与仓库内 `app/`、`frontend/`、`alembic/`、`tests/` 一致；意图分类、prepare 节点与游戏状态落账在 `app/agent/nodes.py`，规则引擎在 `app/game/engine.py`，Graph 条件边和落账节点串联在 `app/agent/graph.py`，所有 prompt 模板在 `app/agent/prompts.py`。分层会话读写见 `app/memory/layered.py`。
 
 ## 许可证
 
