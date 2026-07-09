@@ -1,0 +1,68 @@
+.chat-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100vh;
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.header-button {
+  width: 132px;
+}
+
+.message-list {
+  flex: 1;
+  min-height: 0;
+}
+
+.message {
+  box-sizing: border-box;
+  max-width: 86%;
+  margin-bottom: 18px;
+  border-radius: 8px;
+  padding: 20px;
+  font-size: 26px;
+  line-height: 1.5;
+}
+
+.message.assistant {
+  margin-right: auto;
+  border: 1px solid #ded7c8;
+  background: #fffaf1;
+  color: #1f2933;
+}
+
+.message.user {
+  margin-left: auto;
+  background: #1f4d3a;
+  color: #ffffff;
+}
+
+.action-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.action-button {
+  min-height: 64px;
+}
+
+.composer {
+  display: grid;
+  grid-template-columns: 1fr 128px;
+  gap: 12px;
+}
+
+.composer-input {
+  min-height: 76px;
+}
+
+.send-button {
+  min-height: 76px;
+}

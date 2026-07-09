@@ -1,0 +1,13 @@
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.event-item {
+  border-bottom: 1px solid #e5ddcf;
+  padding-bottom: 18px;
+  color: #344054;
+  font-size: 26px;
+  line-height: 1.5;
+}

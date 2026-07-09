@@ -214,3 +214,18 @@ app.log
 # Virtual environments
 .venv/
 venv/
+
+# Node / Taro frontend
+node_modules/
+frontend-taro/dist/
+frontend-taro/.taro/
+frontend-taro/.temp/
+frontend-taro/.cache/
+frontend-taro/.home/
+frontend-taro/.swc/
+frontend-taro/.env.local
+frontend-taro/.env.*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
