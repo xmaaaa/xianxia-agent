@@ -23,3 +23,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 18px;
 }
+
+.compact-input {
+  min-height: 72px;
+}

@@ -16,7 +16,12 @@ const config: UserConfigExport = {
     "@": path.resolve(__dirname, "..", "src")
   },
   framework: "react",
-  compiler: "webpack5",
+  compiler: {
+    type: "webpack5",
+    prebundle: {
+      enable: false
+    }
+  },
   cache: {
     enable: false
   },
@@ -34,9 +39,18 @@ const config: UserConfigExport = {
   h5: {
     publicPath: "/",
     staticDirectory: "static",
+    devServer: {
+      host: "127.0.0.1",
+      port: 10086,
+      static: false,
+      historyApiFallback: true
+    },
     output: {
       filename: "js/[name].[hash:8].js",
       chunkFilename: "js/[name].[chunkhash:8].js"
+    },
+    htmlPluginOption: {
+      template: path.resolve(__dirname, "..", "src", "index.html")
     },
     miniCssExtractPluginOption: {
       ignoreOrder: true,

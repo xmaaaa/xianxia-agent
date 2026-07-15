@@ -15,6 +15,20 @@
   width: 132px;
 }
 
+.status-strip {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid #d7ceba;
+  border-radius: 8px;
+  background: #fffaf1;
+  padding: 0 18px;
+  color: #4b5563;
+  font-size: 22px;
+}
+
 .message-list {
   flex: 1;
   min-height: 0;

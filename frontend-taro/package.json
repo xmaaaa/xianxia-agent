@@ -26,10 +26,12 @@
   "devDependencies": {
     "@babel/preset-react": "^7.29.7",
     "@babel/runtime": "^7.26.0",
+    "@pmmmwh/react-refresh-webpack-plugin": "^0.6.2",
     "@tarojs/cli": "4.2.0",
     "@tarojs/webpack5-runner": "4.2.0",
     "@types/react": "^18.3.12",
     "babel-preset-taro": "4.2.0",
+    "react-refresh": "^0.14.2",
     "typescript": "^5.7.2"
   },
   "browserslist": [

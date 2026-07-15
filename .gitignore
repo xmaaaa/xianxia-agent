@@ -223,6 +223,7 @@ frontend-taro/.temp/
 frontend-taro/.cache/
 frontend-taro/.home/
 frontend-taro/.swc/
+frontend-taro/project.private.config.json
 frontend-taro/.env.local
 frontend-taro/.env.*.local
 npm-debug.log*

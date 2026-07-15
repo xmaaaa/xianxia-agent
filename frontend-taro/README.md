@@ -1,6 +1,7 @@
 # Xianxia Agent Taro Frontend
 
 Phase 3a mobile frontend scaffold for the Xianxia Agent project.
+Phase 3b connects the scaffold to the existing FastAPI backend with non-streaming chat.
 
 ## Stack
 
@@ -38,4 +39,20 @@ src/
     session.ts   temporary local session state
 ```
 
-Phase 3b should replace the local placeholders in `src/services/api.ts` with calls to the FastAPI backend.
+`src/services/api.ts` contains the API facade used by the pages.
+
+## API
+
+The frontend calls `http://127.0.0.1:8000` by default. Override it with:
+
+```bash
+TARO_APP_API_BASE_URL=https://your-api.example.com npm run build:h5
+```
+
+Current API-backed flows:
+
+- list characters by `user_id`
+- create a character
+- send non-streaming chat messages
+- run action buttons: explore, status, cultivate, rest
+- refresh character panel and inventory after game actions
