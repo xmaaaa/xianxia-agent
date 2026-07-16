@@ -4,6 +4,52 @@
   gap: 14px;
 }
 
+.user-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.refresh-button,
+.create-button {
+  width: 132px;
+}
+
+.active-character {
+  border-color: #b7c7af;
+  background: #fbfff7;
+}
+
+.character-main,
+.role-card-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.role-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 1px solid #ded7c8;
+  border-radius: 8px;
+  background: #fffdf8;
+  padding: 20px;
+}
+
+.role-card.selected {
+  border-color: #1f4d3a;
+  background: #f5fbf3;
+}
+
 .progress {
   width: 100%;
   height: 16px;

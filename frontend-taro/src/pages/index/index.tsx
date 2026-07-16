@@ -87,54 +87,91 @@ export default function IndexPage() {
       </View>
 
       <View className="stack">
-        <View className="panel stack">
-          <Text className="panel-title">用户</Text>
+        <View className="panel user-panel">
+          <View className="section-head">
+            <View>
+              <Text className="eyebrow">当前用户</Text>
+              <Text className="muted">本地开发模式</Text>
+            </View>
+            <Button className="button ghost compact refresh-button" loading={loading} disabled={loading} onClick={() => refreshCharacters(userId)}>
+              刷新
+            </Button>
+          </View>
           <Input className="input compact-input" value={userId} placeholder="user_id" onInput={(event) => handleUserIdInput(event.detail.value)} onBlur={handleUserIdBlur} />
-          <Button className="button ghost" loading={loading} disabled={loading} onClick={() => refreshCharacters(userId)}>
-            刷新角色
-          </Button>
         </View>
 
         {character ? (
-          <View className="panel character-card">
-            <Text className="panel-title">{character.name}</Text>
-            <Text className="muted">
-              {character.realm} · {character.location}
-            </Text>
+          <View className="panel character-card active-character">
+            <Text className="eyebrow">当前角色</Text>
+            <View className="character-main">
+              <View>
+                <Text className="panel-title">{character.name}</Text>
+                <Text className="muted">
+                  {character.realm} · {character.location}
+                </Text>
+              </View>
+              <Text className="badge">{character.sect}</Text>
+            </View>
             <View className="progress">
               <View className="progress-fill" style={{ width: `${Math.min(character.cultivation, 100)}%` }} />
             </View>
-            <Text className="muted">修为进度 {character.cultivation}/100</Text>
+            <View className="meta-row">
+              <Text className="badge">修为 {character.cultivation}/100</Text>
+              <Text className="badge">{character.spiritRoot}</Text>
+            </View>
           </View>
         ) : (
-          <View className="panel character-card">
+          <View className="empty-state">
             <Text className="panel-title">未绑定角色</Text>
-            <Text className="muted">请先选择已有角色，或创建一个新角色。</Text>
+            <Text className="muted">创建角色后会自动绑定，也可以从下方列表选择已有角色。</Text>
           </View>
         )}
-
-        <View className="stack">
-          <Text className="panel-title">可选择角色</Text>
-          {characters.map((item) => (
-            <Button
-              key={item.id}
-              className={`button ${item.id === character?.id ? "" : "secondary"}`}
-              onClick={() => selectCharacter(item)}
-            >
-              {item.id === character?.id ? "已选择" : "选择"} · {item.name} · {item.realm}
-            </Button>
-          ))}
-          {loading && <Text className="muted">正在加载角色...</Text>}
-          {!loading && loadError && <Text className="muted">{loadError}</Text>}
-          {!loading && !loadError && characters.length === 0 && <Text className="muted">当前用户暂无角色</Text>}
-        </View>
 
         <Button className="button" disabled={!character} onClick={() => Taro.navigateTo({ url: "/pages/chat/index" })}>
           进入对话
         </Button>
-        <Button className="button secondary" onClick={() => Taro.navigateTo({ url: "/pages/create/index" })}>
-          创建新角色
-        </Button>
+
+        <View className="panel stack">
+          <View className="section-head">
+            <View>
+              <Text className="eyebrow">角色列表</Text>
+              <Text className="muted">{characters.length ? `${characters.length} 个角色可用` : "按用户 ID 查询后选择"}</Text>
+            </View>
+            <Button className="button secondary compact create-button" onClick={() => Taro.navigateTo({ url: "/pages/create/index" })}>
+              创建
+            </Button>
+          </View>
+
+          {characters.map((item) => (
+            <View key={item.id} className={`role-card ${item.id === character?.id ? "selected" : ""}`}>
+              <View className="role-card-main">
+                <View>
+                  <Text className="panel-title">{item.name}</Text>
+                  <Text className="muted">
+                    {item.realm} · {item.location}
+                  </Text>
+                </View>
+                <Button className={`button compact ${item.id === character?.id ? "" : "secondary"}`} onClick={() => selectCharacter(item)}>
+                  {item.id === character?.id ? "已选择" : "选择"}
+                </Button>
+              </View>
+              <View className="meta-row">
+                <Text className="badge">{item.sect}</Text>
+                <Text className="badge">修为 {item.cultivation}</Text>
+              </View>
+            </View>
+          ))}
+
+          {loading && <Text className="muted">正在加载角色...</Text>}
+          {!loading && loadError && <Text className="muted">{loadError}</Text>}
+          {!loading && !loadError && characters.length === 0 && (
+            <View className="empty-state">
+              <Text className="panel-title">当前用户暂无角色</Text>
+              <Text className="muted">创建一个角色后就可以开始对话和行动。</Text>
+            </View>
+          )}
+        </View>
+
         <View className="quick-grid">
           <Button className="button ghost" onClick={() => Taro.navigateTo({ url: "/pages/character/index" })}>
             角色面板

@@ -2,7 +2,7 @@
   "miniprogramRoot": "dist/",
   "projectname": "xianxia-agent",
   "description": "修仙 AI Agent 微信小程序前端",
-  "appid": "wxf966730e4f7391d0",
+  "appid": "touristappid",
   "setting": {
     "urlCheck": false,
     "es6": true,
